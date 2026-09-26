@@ -2,7 +2,7 @@
 ## Title: FadeUI
 ## Notes: Hide the UI like Alt-Z, element by element: always, in combat, combat or target, out of combat, or never.
 ## Author: Brad
-## Version: 2.0.0
+## Version: 1.0.0
 ## SavedVariablesPerCharacter: FadeUIDB
 ## IconTexture: Interface\Icons\INV_Misc_Eye_01
 ## AddonCompartmentFunc: FadeUI_OnAddonCompartmentClick

@@ -33,9 +33,9 @@ on `FadeUI/` (config in `.luacheckrc`). Work happens on branches off `main`, mer
 Bump `## Version` in `FadeUI/FadeUI.toc`, then push a tag:
 
 ```sh
-git tag v2.0.1 && git push origin v2.0.1
+git tag v1.0.1 && git push origin v1.0.1
 ```
 
 GitHub Actions runs the [BigWigs packager](https://github.com/BigWigsMods/packager),
-which builds `FadeUI-v2.0.1.zip` (excluding dev files listed in `.pkgmeta`) and
+which builds `FadeUI-v1.0.1.zip` (excluding dev files listed in `.pkgmeta`) and
 attaches it to a GitHub release.
