@@ -4,6 +4,7 @@
 ## Author: Brad
 ## Version: 1.0.0
 ## SavedVariablesPerCharacter: FadeUIDB
+## X-Curse-Project-ID: 1713253
 ## IconTexture: Interface\Icons\INV_Misc_Eye_01
 ## AddonCompartmentFunc: FadeUI_OnAddonCompartmentClick
 
