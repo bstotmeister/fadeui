@@ -94,7 +94,7 @@ FadeUI.GROUPS = {
 		{ id = 14, key = "tot",     label = "Target of Target",  frames = { "TargetFrameToT" },      default = "combat",
 		  note = "Sits inside the Target Frame, so it is also hidden whenever that is." },
 		{ id = 15, key = "focus",   label = "Focus Frame",       frames = { "FocusFrame" },          default = "combat" },
-		{ id = 16, key = "castbar", label = "Cast Bar",          frames = { "PlayerCastingBarFrame" }, default = "always",
+		{ id = 16, key = "castbar", label = "Cast Bar",          frames = { "PlayerCastingBarFrame" }, default = "always", direct = true,
 		  note = "Only appears while you cast anyway. If it is locked to the Player Frame in Edit Mode, it hides with that frame too." },
 		{ id = 17, key = "boss",    label = "Boss Frames",       frames = { "BossTargetFrameContainer" }, default = "always" },
 	}},
@@ -107,13 +107,13 @@ FadeUI.GROUPS = {
 		{ id = 21, key = "minimap", label = "Minimap",           frames = { "MinimapCluster" },      default = "never" },
 		{ id = 22, key = "buffs",   label = "Buffs",             frames = { "BuffFrame" },           default = "never" },
 		{ id = 23, key = "debuffs", label = "Debuffs",           frames = { "DebuffFrame" },         default = "combat" },
-		{ id = 24, key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "never" },
+		{ id = 24, key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "never", direct = true },
 		{ id = 25, key = "chat",    label = "Chat",              frames = CHAT_FRAMES,               default = "never",
 		  note = "Chat always comes back while you are typing a message." },
 		{ id = 26, key = "micro",   label = "Menu Buttons",      frames = { "MicroMenuContainer" },  default = "never" },
 		{ id = 27, key = "bags",    label = "Bag Buttons",       frames = { "BagsBar" },             default = "never" },
 		{ id = 28, key = "xp",      label = "XP / Rep Bars",     frames = { "MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer" }, default = "never" },
-		{ id = 29, key = "cdm",     label = "Cooldown Manager",  frames = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }, default = "combat" },
+		{ id = 29, key = "cdm",     label = "Cooldown Manager",  frames = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }, default = "combat", direct = true },
 		{ id = 30, key = "meter",   label = "Damage Meter",      frames = { "DamageMeter" },         default = "never" },
 	}},
 }
@@ -212,7 +212,24 @@ animator:SetScript("OnUpdate", function(self, elapsed)
 	if not busy then self:Hide() end
 end)
 
+local wanted = {}  -- frame -> whether Blizzard wants it shown (direct elements only)
+
+-- Show or hide a direct element (see AttachDirect). It is only brought back if
+-- Blizzard wants it shown: a cast bar with no cast, or an empty quest tracker,
+-- stays hidden.
+local function SetFrameShown(frame, shown)
+	if shown and not wanted[frame] then return end
+	if frame:IsShown() == shown or (InCombatLockdown() and frame:IsProtected()) then return end
+	guard = true
+	frame:SetShown(shown)
+	guard = false
+end
+
 local function Holder_OnShow(self)
+	if self.fadeuiDirect then
+		SetFrameShown(self.fadeuiFrame, true)
+		return
+	end
 	if db and (db.fadeIn or 0) > 0 and loggedIn and attached[self.fadeuiFrame] then
 		self:SetAlpha(0)
 		fading[self] = true
@@ -223,6 +240,9 @@ end
 local function Holder_OnHide(self)
 	fading[self] = nil
 	self:SetAlpha(1)
+	if self.fadeuiDirect and attached[self.fadeuiFrame] then
+		SetFrameShown(self.fadeuiFrame, false)
+	end
 end
 
 local function SetDriver(h, driver)
@@ -238,6 +258,29 @@ local function SetDriver(h, driver)
 	else
 		h:Show()
 	end
+end
+
+-- Some Blizzard frames are "managed": whenever they show, and whenever the screen
+-- is rearranged, their container clears their position, moves them into itself
+-- and lays out its direct children. Taking the frame into its holder before that
+-- layout runs leaves it with no position at all, so it never draws. Instead the
+-- holder waits until the container has finished, and the frame keeps the spot
+-- the layout gave it. (Later layouts don't leave room for it, so a neighbouring
+-- managed frame can occasionally overlap it.)
+local hookedContainers = {}
+
+local function IsManagedContainer(frame, parent)
+	local c = frame.layoutParent
+	return c ~= nil and parent ~= nil and (parent == c or parent == c.BottomManagedLayoutContainer)
+end
+
+local function HookManagedContainer(frame)
+	local c = frame.layoutParent
+	if type(c) ~= "table" or type(c.UpdateFrame) ~= "function" or hookedContainers[c] then return end
+	hookedContainers[c] = true
+	hooksecurefunc(c, "UpdateFrame", function(_, f)
+		if holders[f] and not attached[f] and not holders[f].fadeuiDirect then FadeUI.Apply() end
+	end)
 end
 
 local function Attach(frame)
@@ -256,13 +299,15 @@ local function Attach(frame)
 		h:SetScript("OnShow", Holder_OnShow)
 		h:SetScript("OnHide", Holder_OnHide)
 		holders[frame] = h
-		-- If Blizzard moves the element to a new parent later (the cast bar does
-		-- this when it's locked to the player frame), move the holder with it.
+		-- If Blizzard moves the element to a new parent later, move the holder
+		-- with it. A managed frame (see HookManagedContainer) is moved into its
+		-- container and then laid out, so it's taken back once that's done.
 		hooksecurefunc(frame, "SetParent", function(self, newParent)
 			if guard or not attached[self] or newParent == holders[self] then return end
 			attached[self] = nil
-			FadeUI.Apply()
+			if not IsManagedContainer(self, newParent) then FadeUI.Apply() end
 		end)
+		HookManagedContainer(frame)
 	end
 
 	h:ClearAllPoints()
@@ -278,6 +323,35 @@ local function Attach(frame)
 	frame:SetFrameLevel(level)
 
 	attached[frame] = true
+	return h
+end
+
+-- Managed frames that aren't protected (the cast bar, quest tracker, cooldown
+-- manager) stay out of holders completely, so Blizzard's layout keeps working
+-- as normal. The holder just carries the state driver, and the frame itself is
+-- hidden while the holder is hidden.
+local function AttachDirect(frame)
+	local h = holders[frame]
+	if not h then
+		h = CreateFrame("Frame", nil, UIParent)
+		h.fadeuiFrame = frame
+		h.fadeuiDirect = true
+		h:SetScript("OnShow", Holder_OnShow)
+		h:SetScript("OnHide", Holder_OnHide)
+		holders[frame] = h
+		wanted[frame] = frame:IsShown()
+		local function Want(self, shown)
+			if not guard then wanted[self] = shown and true or false end
+		end
+		hooksecurefunc(frame, "Show", function(self) Want(self, true) end)
+		hooksecurefunc(frame, "Hide", function(self) Want(self, false) end)
+		hooksecurefunc(frame, "SetShown", Want)
+		frame:HookScript("OnShow", function(self)
+			if attached[self] and not holders[self]:IsShown() then SetFrameShown(self, false) end
+		end)
+	end
+	attached[frame] = true
+	if not h:IsShown() then SetFrameShown(frame, false) end
 	return h
 end
 
@@ -353,7 +427,7 @@ function FadeUI.Apply()
 			if f then
 				el.found = el.found + 1
 				if active then
-					SetDriver(Attach(f), mode.driver)
+					SetDriver((el.direct and AttachDirect or Attach)(f), mode.driver)
 				else
 					Detach(f)
 				end

@@ -25,6 +25,13 @@
         "BINDING_NAME_FADEUI_OPTIONS",
         "SLASH_FADEUI1",
         "SLASH_FADEUI2",
-        "SlashCmdList"
+        "SlashCmdList",
+        "UnregisterStateDriver",
+        "DEFAULT_CHAT_FRAME",
+        "RegisterStateDriver",
+        "ChatEdit_GetActiveWindow",
+        "ChatEdit_ActivateChat",
+        "ChatEdit_DeactivateChat",
+        "UISpecialFrames"
     ]
 }
