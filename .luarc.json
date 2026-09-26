@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime.version": "Lua 5.1",
+  "workspace.library": [],
+  "diagnostics.globals": [
+    "FadeUI", "FadeUIDB",
+    "FadeUI_Toggle", "FadeUI_OpenOptions", "FadeUI_OnAddonCompartmentClick",
+    "BINDING_HEADER_FADEUI", "BINDING_NAME_FADEUI_TOGGLE", "BINDING_NAME_FADEUI_OPTIONS",
+    "SLASH_FADEUI1", "SLASH_FADEUI2", "SlashCmdList"
+  ],
+  "diagnostics.disable": ["undefined-global"]
+}

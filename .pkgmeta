@@ -1,0 +1,7 @@
+package-as: FadeUI
+
+ignore:
+  - README.md
+  - scripts
+  - .luarc.json
+  - .github
