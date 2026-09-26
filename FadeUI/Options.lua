@@ -180,7 +180,7 @@ local function ElementRow(parent, el, y)
 	end)
 
 	row.segs = {}
-	for i, mode in ipairs(FadeUI.MODES) do
+	for i, mode in ipairs(el.modes) do
 		local b = Button(row, mode.label, SEG_W, SEG_H, function()
 			FadeUI.SetMode(el.key, mode.key)
 		end, mode.color)
@@ -188,6 +188,20 @@ local function ElementRow(parent, el, y)
 		b.mode = mode
 		Tooltip(b, el.label .. ": " .. mode.label, mode.tip)
 		row.segs[i] = b
+	end
+
+	-- Chat's idle time sits in its row, after its buttons.
+	if el.key == "chat" then
+		local x = LABEL_W + #row.segs * (SEG_W + SEG_GAP) + 8
+		local label = Text(row, "GameFontHighlightSmall", "Idle:")
+		label:SetPoint("LEFT", x, 0)
+		row.idle = SecondsBox(row, "chatIdle")
+		row.idle:SetPoint("LEFT", label, "RIGHT", 6, 0)
+		local unit = Text(row, "GameFontHighlightSmall", "s", MUTED)
+		unit:SetPoint("LEFT", row.idle, "RIGHT", 3, 0)
+		Tooltip(row.idle, "Chat idle",
+			"With chat on \"When active\": seconds without a new message in the chat window you're looking at, or typing, before chat hides.")
+		refs.fade[#refs.fade + 1] = row.idle
 	end
 
 	local function over() hl:Show() end
@@ -425,6 +439,7 @@ function FadeUI.RefreshOptions()
 			SetActive(b, b.mode.key == current)
 			b:SetAlpha(missing and 0.45 or 1)
 		end
+		if row.idle then row.idle:SetAlpha(current == "active" and 1 or 0.45) end
 		if missing then
 			row.label:SetText(row.el.label .. " |cff777777(not found)|r")
 			row.label:SetTextColor(0.5, 0.5, 0.5)
