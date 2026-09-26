@@ -42,4 +42,4 @@ to a GitHub release, and uploads it to CurseForge using the `CF_API_KEY` repo se
 
 To release from your machine instead (needs bash 4.3+, e.g. `brew install bash`), put
 `CF_API_KEY=...` in a gitignored `.env` file at the repo root, check out the tag, and run
-the packager's [`release.sh`](https://github.com/BigWigsMods/packager/blob/master/release.sh).
+`scripts/release.sh` (a copy of the packager's [`release.sh`](https://github.com/BigWigsMods/packager/blob/master/release.sh)).
