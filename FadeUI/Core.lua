@@ -7,7 +7,8 @@
 --   secure state driver ("[combat] show; hide" and so on). A hidden holder hides
 --   the element completely, like Alt-Z: it can't be seen or clicked, but keybinds
 --   still fire. State drivers are run by Blizzard's secure code, so elements appear
---   and disappear in combat without "action blocked" errors.
+--   and disappear in combat without "action blocked" errors. Out of combat, a hide
+--   can wait (fade-out delay) and fade out before it happens.
 --
 --   Moving protected frames is only allowed out of combat, so setting changes made
 --   during a fight are applied as soon as the fight ends.
@@ -141,6 +142,8 @@ local loggedIn = false
 local function Defaults(target)
 	target.enabled = true -- FadeUI on (the Alt-Z-like state)
 	target.fadeIn = 2     -- fade-in time, tenths of a second (0 = instant)
+	target.fadeOut = 0    -- fade-out time, tenths of a second (0 = instant)
+	target.fadeDelay = 0  -- wait before fading out, tenths of a second
 	target.macro = true   -- keep a copy of the settings in a macro (beta workaround)
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
@@ -159,8 +162,11 @@ end
 
 function FadeUI.GetDB() return db end
 
--- Compact form used by the settings macro: version, on/off, fade-in, then one
--- mode letter per element id ("_" = unknown).
+FadeUI.MAX_TIME = 999 -- tenths of a second; three digits in the settings macro
+
+-- Compact form used by the settings macro: version, on/off, fade-in, fade-out,
+-- fade-out delay (three digits each), then one mode letter per element id
+-- ("_" = unknown).
 function FadeUI.Encode()
 	local codes = {}
 	for id = 1, MAX_ID do
@@ -168,15 +174,25 @@ function FadeUI.Encode()
 		local m = el and MODE[db.modes[el.key]]
 		codes[id] = m and m.code or "_"
 	end
-	return ("2%d%d%s"):format(db.enabled and 1 or 0, math.min(9, math.max(0, db.fadeIn or 0)), table.concat(codes))
+	local function t(v) return math.min(FadeUI.MAX_TIME, math.max(0, v or 0)) end
+	return ("3%d%03d%03d%03d%s"):format(db.enabled and 1 or 0,
+		t(db.fadeIn), t(db.fadeOut), t(db.fadeDelay), table.concat(codes))
 end
 
 function FadeUI.Decode(s)
 	if type(s) ~= "string" or not db then return false end
-	local enabled, fade, codes = s:match("^2([01])(%d)([ACTON_]*)")
+	local enabled, fadeIn, fadeOut, delay, codes = s:match("^3([01])(%d%d%d)(%d%d%d)(%d%d%d)([ACTON_]*)")
+	if not enabled then
+		-- version 2: single-digit fade-in, no fade-out
+		enabled, fadeIn, codes = s:match("^2([01])(%d)([ACTON_]*)")
+	end
 	if not enabled then return false end
 	db.enabled = enabled == "1"
-	db.fadeIn = tonumber(fade)
+	db.fadeIn = tonumber(fadeIn)
+	if fadeOut then
+		db.fadeOut = tonumber(fadeOut)
+		db.fadeDelay = tonumber(delay)
+	end
 	for id = 1, #codes do
 		local el, m = BY_ID[id], MODE_BY_CODE[codes:sub(id, id)]
 		if el and m then db.modes[el.key] = m.key end
@@ -192,18 +208,30 @@ local holders = {}   -- frame -> holder
 local attached = {}  -- frame -> true while it lives inside its holder
 local guard = false  -- set while we call SetParent ourselves
 
-local fading = {}
+local fading = {}  -- holder -> alpha it is fading to (1 = in, 0 = out)
+
+local function FinishHide(h)
+	if InCombatLockdown() and h:IsProtected() then
+		h:SetAlpha(1) -- can't hide it now; don't leave it invisible but clickable
+	else
+		h:Hide()
+	end
+end
+
 local animator = CreateFrame("Frame")
 animator:Hide()
 animator:SetScript("OnUpdate", function(self, elapsed)
-	local duration = db and (db.fadeIn or 0) / 10 or 0
-	local step = duration > 0 and elapsed / duration or 1
 	local busy = false
-	for h in pairs(fading) do
-		local a = h:GetAlpha() + step
-		if a >= 1 or not h:IsShown() then
+	for h, target in pairs(fading) do
+		local duration = db and (target == 1 and db.fadeIn or db.fadeOut) or 0
+		local step = duration > 0 and elapsed / (duration / 10) or 1
+		local a = h:GetAlpha() + (target == 1 and step or -step)
+		if not h:IsShown() or a >= 1 then
 			h:SetAlpha(1)
 			fading[h] = nil
+		elseif a <= 0 then
+			fading[h] = nil
+			FinishHide(h)
 		else
 			h:SetAlpha(a)
 			busy = true
@@ -212,29 +240,96 @@ animator:SetScript("OnUpdate", function(self, elapsed)
 	if not busy then self:Hide() end
 end)
 
+local function CancelFadeOut(h)
+	if h.fadeuiTimer then
+		h.fadeuiTimer:Cancel()
+		h.fadeuiTimer = nil
+	end
+	if fading[h] == 0 then
+		fading[h] = nil
+		h:SetAlpha(1)
+	end
+end
+
+local function StartFadeOut(h)
+	h.fadeuiTimer = nil
+	if not h:IsShown() then return end
+	if (db.fadeOut or 0) > 0 then
+		fading[h] = 0
+		animator:Show()
+	else
+		FinishHide(h)
+	end
+end
+
+-- The holder's state driver changed to "show" or "hide". Secure holders run
+-- STATE_SNIPPET first, which has already shown them (or hidden them in combat).
+local function Holder_State(h, state)
+	if h.fadeuiTimer then
+		h.fadeuiTimer:Cancel()
+		h.fadeuiTimer = nil
+	end
+	if state == "show" then
+		if not h:IsShown() then
+			h:Show()
+		elseif fading[h] == 0 then
+			fading[h] = 1 -- fade back in from wherever the fade-out got to
+			animator:Show()
+		end
+	elseif InCombatLockdown() or not loggedIn then
+		fading[h] = nil
+		FinishHide(h)
+	elseif h:IsShown() and fading[h] ~= 0 then
+		local delay = (db.fadeDelay or 0) / 10
+		if delay > 0 then
+			h.fadeuiTimer = C_Timer.NewTimer(delay, function() StartFadeOut(h) end)
+		else
+			StartFadeOut(h)
+		end
+	end
+end
+
+local function Holder_OnAttributeChanged(self, name, value)
+	if name == "state-fadeui" then Holder_State(self, value) end
+end
+
+-- Runs in Blizzard's secure environment, so protected holders can be shown and
+-- hidden in combat. Out of combat the hide is left to Holder_State.
+local STATE_SNIPPET = [[
+	if newstate == "show" then
+		self:Show()
+	elseif PlayerInCombat() then
+		self:Hide()
+		return
+	end
+	self:CallMethod("FadeUI_State", newstate)
+]]
+
 local function Holder_OnShow(self)
 	if db and (db.fadeIn or 0) > 0 and loggedIn and attached[self.fadeuiFrame] then
 		self:SetAlpha(0)
-		fading[self] = true
+		fading[self] = 1
 		animator:Show()
 	end
 end
 
 local function Holder_OnHide(self)
+	CancelFadeOut(self)
 	fading[self] = nil
 	self:SetAlpha(1)
 end
 
 local function SetDriver(h, driver)
 	if h.fadeuiDriver == driver then return end
-	UnregisterStateDriver(h, "visibility")
+	UnregisterStateDriver(h, "fadeui")
+	CancelFadeOut(h)
 	h.fadeuiDriver = driver
 	if driver == "show" then
 		h:Show()
 	elseif driver == "hide" then
 		h:Hide()
 	elseif driver then
-		RegisterStateDriver(h, "visibility", driver)
+		RegisterStateDriver(h, "fadeui", driver)
 	else
 		h:Show()
 	end
@@ -251,7 +346,17 @@ local function Attach(frame)
 	local strata, level = frame:GetFrameStrata(), frame:GetFrameLevel()
 
 	if not h then
-		h = CreateFrame("Frame", nil, parent)
+		-- Holders of protected frames (action bars...) need a secure handler to
+		-- be shown and hidden in combat. Others stay plain, so chat can still
+		-- peek in combat.
+		local secure = frame:IsProtected()
+		h = CreateFrame("Frame", nil, parent, secure and "SecureHandlerStateTemplate" or nil)
+		if secure then
+			h:SetAttribute("_onstate-fadeui", STATE_SNIPPET)
+		else
+			h:SetScript("OnAttributeChanged", Holder_OnAttributeChanged)
+		end
+		h.FadeUI_State = Holder_State
 		h.fadeuiFrame = frame
 		h:SetScript("OnShow", Holder_OnShow)
 		h:SetScript("OnHide", Holder_OnHide)
@@ -497,6 +602,13 @@ function FadeUI.SetEnabled(on)
 	if InCombatLockdown() then
 		Print("will turn %s when combat ends.", db.enabled and "on" or "off")
 	end
+	FadeUI.Changed()
+end
+
+-- `field` is "fadeIn", "fadeOut" or "fadeDelay"; `seconds` may be fractional.
+function FadeUI.SetTime(field, seconds)
+	if not db or type(seconds) ~= "number" then return end
+	db[field] = math.min(FadeUI.MAX_TIME, math.max(0, math.floor(seconds * 10 + 0.5)))
 	FadeUI.Changed()
 end
 

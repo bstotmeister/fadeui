@@ -113,6 +113,30 @@ local function Checkbox(parent, label, onClick)
 	return c
 end
 
+-- A small box for a number of seconds. `field` is the setting it edits.
+local function SecondsBox(parent, field)
+	local e = CreateFrame("EditBox", nil, parent)
+	e:SetSize(40, SEG_H)
+	e:SetAutoFocus(false)
+	e:SetFontObject("GameFontHighlightSmall")
+	e:SetJustifyH("CENTER")
+	e:SetMaxLetters(4)
+	Fill(e, "BACKGROUND", BTN)
+	Outline(e, LINE)
+	e.field = field
+	e:SetScript("OnEnterPressed", e.ClearFocus)
+	e:SetScript("OnEscapePressed", function(self)
+		self.cancel = true
+		self:ClearFocus()
+	end)
+	e:SetScript("OnEditFocusLost", function(self)
+		if not self.cancel then FadeUI.SetTime(self.field, tonumber(self:GetText())) end
+		self.cancel = nil
+		FadeUI.RefreshOptions() -- shows the stored value (rounded, clamped, or unchanged)
+	end)
+	return e
+end
+
 -------------------------------------------------------------------------------
 -- Rows
 -------------------------------------------------------------------------------
@@ -228,10 +252,13 @@ end
 -- Window
 -------------------------------------------------------------------------------
 
-local FADE_CHOICES = {
-	{ value = 0, label = "Off",   tip = "Elements pop in instantly." },
-	{ value = 2, label = "Quick", tip = "Elements fade in over 0.2 seconds." },
-	{ value = 5, label = "Slow",  tip = "Elements fade in over 0.5 seconds." },
+local FADE_BOXES = {
+	{ field = "fadeIn",    label = "Fade in",
+	  tip = "Seconds an element takes to fade in when it appears. 0 = instant." },
+	{ field = "fadeOut",   label = "Fade out",
+	  tip = "Seconds an element takes to fade out before it hides. 0 = instant. In combat, elements always hide instantly." },
+	{ field = "fadeDelay", label = "Delay",
+	  tip = "Seconds to wait before an element starts fading out, e.g. after combat ends. If it's needed again during the wait, it stays." },
 }
 
 local function Build()
@@ -282,25 +309,25 @@ local function Build()
 	Tooltip(refs.master, "Hide the UI",
 		"When this is off, FadeUI puts everything back exactly as Blizzard had it. Bind a key to switch it under Key Bindings > AddOns > FadeUI.")
 
-	-- Fade-in speed
-	local fadeLabel = Text(win, "GameFontHighlight", "Fade in:")
+	-- Fade times, in seconds
 	refs.fade = {}
-	for i = #FADE_CHOICES, 1, -1 do
-		local choice = FADE_CHOICES[i]
-		local b = Button(win, choice.label, 58, SEG_H, function()
-			FadeUI.GetDB().fadeIn = choice.value
-			FadeUI.Changed()
-		end)
-		b.value = choice.value
-		if i == #FADE_CHOICES then
-			b:SetPoint("TOPRIGHT", -PAD, y + 2)
+	local anchor
+	for i = #FADE_BOXES, 1, -1 do
+		local info = FADE_BOXES[i]
+		local unit = Text(win, "GameFontHighlightSmall", "s", MUTED)
+		if anchor then
+			unit:SetPoint("RIGHT", anchor, "LEFT", -14, 0)
 		else
-			b:SetPoint("RIGHT", refs.fade[#refs.fade], "LEFT", -SEG_GAP, 0)
+			unit:SetPoint("TOPRIGHT", -PAD, y - 1)
 		end
-		Tooltip(b, "Fade in: " .. choice.label, choice.tip)
-		refs.fade[#refs.fade + 1] = b
+		local e = SecondsBox(win, info.field)
+		e:SetPoint("RIGHT", unit, "LEFT", -3, 0)
+		local label = Text(win, "GameFontHighlight", info.label .. ":")
+		label:SetPoint("RIGHT", e, "LEFT", -6, 0)
+		Tooltip(e, info.label, info.tip)
+		refs.fade[#refs.fade + 1] = e
+		anchor = label
 	end
-	fadeLabel:SetPoint("RIGHT", refs.fade[#refs.fade], "LEFT", -8, 0)
 
 	-- Settings macro
 	y = y - 26
@@ -387,7 +414,9 @@ function FadeUI.RefreshOptions()
 
 	refs.master:SetChecked(db.enabled)
 	refs.macro:SetChecked(db.macro)
-	for _, b in ipairs(refs.fade) do SetActive(b, b.value == db.fadeIn) end
+	for _, e in ipairs(refs.fade) do
+		if not e:HasFocus() then e:SetText(("%g"):format((db[e.field] or 0) / 10)) end
+	end
 
 	for _, row in ipairs(rows) do
 		local current = db.modes[row.el.key]
