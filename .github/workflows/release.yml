@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Builds FadeUI-<tag>.zip and attaches it to a GitHub release.
+      # To also upload to CurseForge/Wago, add CF_API_KEY / WAGO_API_TOKEN secrets
+      # and "## X-Curse-Project-ID" / "## X-Wago-ID" lines to FadeUI.toc.
+      - uses: BigWigsMods/packager@v2
+        env:
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
