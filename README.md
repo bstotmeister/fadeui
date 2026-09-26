@@ -25,9 +25,8 @@ Set `WOW_DIR` if WoW isn't installed at `/Applications/World of Warcraft`.
 
 ## Checks
 
-Every push and pull request to `develop` or `main` runs [luacheck](https://github.com/lunarmodules/luacheck)
-on `FadeUI/` (config in `.luacheckrc`). `main` only accepts changes through a pull request that passes it.
-Work happens on branches off `develop`, and `develop` is merged into `main` for releases.
+Every push and pull request to `main` runs [luacheck](https://github.com/lunarmodules/luacheck)
+on `FadeUI/` (config in `.luacheckrc`). Work happens on branches off `main`, merged back by pull request.
 
 ## Releasing
 
