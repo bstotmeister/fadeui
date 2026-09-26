@@ -35,6 +35,7 @@ read_globals = {
 	"GetMacroBody",
 	"GetMacroIndexByName",
 	"GetRealmName",
+	"GetTime",
 	"InCombatLockdown",
 	"RegisterStateDriver",
 	"SecureCmdOptionParse",

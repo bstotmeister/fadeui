@@ -73,6 +73,7 @@ local CHAT_FRAMES = {
 for i = 1, 10 do
 	CHAT_FRAMES[#CHAT_FRAMES + 1] = "ChatFrame" .. i
 	CHAT_FRAMES[#CHAT_FRAMES + 1] = "ChatFrame" .. i .. "Tab"
+	CHAT_FRAMES[#CHAT_FRAMES + 1] = "ChatFrame" .. i .. "EditBox"
 end
 
 FadeUI.GROUPS = {
@@ -111,7 +112,7 @@ FadeUI.GROUPS = {
 		{ id = 23, key = "debuffs", label = "Debuffs",           frames = { "DebuffFrame" },         default = "combat" },
 		{ id = 24, key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "target", direct = true },
 		{ id = 25, key = "chat",    label = "Chat",              frames = CHAT_FRAMES,               default = "always",
-		  note = "Chat always comes back while you are typing a message." },
+		  note = "Chat always comes back while you are typing a message. It can also hide after a while with no new messages (Chat idle, at the top)." },
 		{ id = 26, key = "micro",   label = "Menu Buttons",      frames = { "MicroMenuContainer" },  default = "never" },
 		{ id = 27, key = "bags",    label = "Bag Buttons",       frames = { "BagsBar" },             default = "never" },
 		{ id = 28, key = "xp",      label = "XP / Rep Bars",     frames = { "MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer" }, default = "never" },
@@ -145,6 +146,7 @@ local function Defaults(target)
 	target.fadeIn = 5     -- fade-in time, tenths of a second (0 = instant)
 	target.fadeOut = 5    -- fade-out time, tenths of a second (0 = instant)
 	target.fadeDelay = 50 -- wait before fading out, tenths of a second
+	target.chatIdle = 300 -- hide chat after this long without activity, tenths of a second (0 = off)
 	target.macro = true   -- keep a copy of the settings in a macro (beta workaround)
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
@@ -166,8 +168,8 @@ function FadeUI.GetDB() return db end
 FadeUI.MAX_TIME = 999 -- tenths of a second; three digits in the settings macro
 
 -- Compact form used by the settings macro: version, on/off, fade-in, fade-out,
--- fade-out delay (three digits each), then one mode letter per element id
--- ("_" = unknown).
+-- fade-out delay, chat idle (three digits each), then one mode letter per
+-- element id ("_" = unknown).
 function FadeUI.Encode()
 	local codes = {}
 	for id = 1, MAX_ID do
@@ -176,13 +178,17 @@ function FadeUI.Encode()
 		codes[id] = m and m.code or "_"
 	end
 	local function t(v) return math.min(FadeUI.MAX_TIME, math.max(0, v or 0)) end
-	return ("3%d%03d%03d%03d%s"):format(db.enabled and 1 or 0,
-		t(db.fadeIn), t(db.fadeOut), t(db.fadeDelay), table.concat(codes))
+	return ("4%d%03d%03d%03d%03d%s"):format(db.enabled and 1 or 0,
+		t(db.fadeIn), t(db.fadeOut), t(db.fadeDelay), t(db.chatIdle), table.concat(codes))
 end
 
 function FadeUI.Decode(s)
 	if type(s) ~= "string" or not db then return false end
-	local enabled, fadeIn, fadeOut, delay, codes = s:match("^3([01])(%d%d%d)(%d%d%d)(%d%d%d)([ACTON_]*)")
+	local enabled, fadeIn, fadeOut, delay, chatIdle, codes = s:match("^4([01])(%d%d%d)(%d%d%d)(%d%d%d)(%d%d%d)([ACTON_]*)")
+	if not enabled then
+		-- version 3: no chat idle
+		enabled, fadeIn, fadeOut, delay, codes = s:match("^3([01])(%d%d%d)(%d%d%d)(%d%d%d)([ACTON_]*)")
+	end
 	if not enabled then
 		-- version 2: single-digit fade-in, no fade-out
 		enabled, fadeIn, codes = s:match("^2([01])(%d)([ACTON_]*)")
@@ -194,6 +200,7 @@ function FadeUI.Decode(s)
 		db.fadeOut = tonumber(fadeOut)
 		db.fadeDelay = tonumber(delay)
 	end
+	if chatIdle then db.chatIdle = tonumber(chatIdle) end
 	for id = 1, #codes do
 		local el, m = BY_ID[id], MODE_BY_CODE[codes:sub(id, id)]
 		if el and m then db.modes[el.key] = m.key end
@@ -264,9 +271,20 @@ local function StartFadeOut(h)
 	end
 end
 
+-- Chat is shown while you type, and hidden once it has been idle (see ChatIdleCheck).
+local chatIdle = false
+
+local function ChatState(state)
+	if ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow() then return "show" end
+	if chatIdle then return "hide" end
+	return state
+end
+
 -- The holder's state driver changed to "show" or "hide". Secure holders run
 -- STATE_SNIPPET first, which has already shown them (or hidden them in combat).
-local function Holder_State(h, state)
+-- `now` skips the fade-out delay.
+local function Holder_State(h, state, now)
+	if h.fadeuiChat then state = ChatState(state) end
 	if h.fadeuiTimer then
 		h.fadeuiTimer:Cancel()
 		h.fadeuiTimer = nil
@@ -282,7 +300,7 @@ local function Holder_State(h, state)
 		fading[h] = nil
 		FinishHide(h)
 	elseif h:IsShown() and fading[h] ~= 0 then
-		local delay = (db.fadeDelay or 0) / 10
+		local delay = now and 0 or (db.fadeDelay or 0) / 10
 		if delay > 0 then
 			h.fadeuiTimer = C_Timer.NewTimer(delay, function() StartFadeOut(h) end)
 		else
@@ -486,28 +504,45 @@ local function GetFrame(name)
 	end
 end
 
--- Chat comes back while you type, so you can see what you're writing.
+-- Chat comes back while you type, so you can see what you're writing, and
+-- hides once it has been idle (see ChatState).
 function FadeUI.UpdateChatPeek()
 	local el = BY_KEY.chat
 	if not el or not db or not loggedIn then return end
-	local typing = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow() and true or false
 	for _, name in ipairs(el.frames) do
 		local f = GetFrame(name)
 		local h = f and holders[f]
-		if h and attached[f] and h.fadeuiDriver then
-			local want
-			if typing or h.fadeuiDriver == "show" then
-				want = true
-			elseif h.fadeuiDriver == "hide" then
-				want = false
-			else
-				want = SecureCmdOptionParse(h.fadeuiDriver) == "show"
-			end
-			if want ~= h:IsShown() and not (InCombatLockdown() and h:IsProtected()) then
-				h:SetShown(want)
-			end
+		if h and attached[f] and h.fadeuiDriver and not (InCombatLockdown() and h:IsProtected()) then
+			local state = h.fadeuiDriver
+			if state ~= "show" and state ~= "hide" then state = SecureCmdOptionParse(state) end
+			Holder_State(h, state, true)
 		end
 	end
+end
+
+-- Chat is idle once the shown chat window has had no new message, and you
+-- haven't typed, for db.chatIdle.
+local chatLastActive, chatTimer = 0, nil
+
+local function ChatIdleCheck()
+	if chatTimer then
+		chatTimer:Cancel()
+		chatTimer = nil
+	end
+	local timeout = db and (db.chatIdle or 0) / 10 or 0
+	local left = chatLastActive + timeout - GetTime()
+	if timeout > 0 and left > 0 then chatTimer = C_Timer.NewTimer(left, ChatIdleCheck) end
+	local idle = timeout > 0 and left <= 0
+	if idle ~= chatIdle then
+		chatIdle = idle
+		FadeUI.UpdateChatPeek()
+	end
+end
+
+function FadeUI.ChatActivity()
+	chatLastActive = GetTime()
+	-- A pending timer re-checks the time itself when it fires.
+	if chatIdle or not chatTimer then ChatIdleCheck() end
 end
 
 -------------------------------------------------------------------------------
@@ -536,7 +571,9 @@ function FadeUI.Apply()
 			if f then
 				el.found = el.found + 1
 				if active then
-					SetDriver((el.direct and AttachDirect or Attach)(f), mode.driver)
+					local h = (el.direct and AttachDirect or Attach)(f)
+					h.fadeuiChat = el.key == "chat"
+					SetDriver(h, mode.driver)
 				else
 					Detach(f)
 				end
@@ -544,6 +581,7 @@ function FadeUI.Apply()
 		end
 	end
 
+	ChatIdleCheck()
 	FadeUI.UpdateChatPeek()
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 end
@@ -683,7 +721,7 @@ function FadeUI.SetEnabled(on)
 	FadeUI.Changed()
 end
 
--- `field` is "fadeIn", "fadeOut" or "fadeDelay"; `seconds` may be fractional.
+-- `field` is "fadeIn", "fadeOut", "fadeDelay" or "chatIdle"; `seconds` may be fractional.
 function FadeUI.SetTime(field, seconds)
 	if not db or type(seconds) ~= "number" then return end
 	db[field] = math.min(FadeUI.MAX_TIME, math.max(0, math.floor(seconds * 10 + 0.5)))
@@ -742,16 +780,34 @@ events:SetScript("OnEvent", function(_, event, arg1)
 
 	elseif event == "PLAYER_LOGIN" then
 		loggedIn = true
+		chatLastActive = GetTime()
 		if mirror.macrosSeen then MirrorReady() else TryRestore() end
 		FadeUI.Apply()
 
 		if ChatEdit_ActivateChat then
-			hooksecurefunc("ChatEdit_ActivateChat", function() FadeUI.UpdateChatPeek() end)
+			hooksecurefunc("ChatEdit_ActivateChat", function(editBox)
+				FadeUI.UpdateChatPeek()
+				-- The box may have been hidden (with chat) when it was asked to take focus.
+				if editBox and editBox.HasFocus and not editBox:HasFocus() then editBox:SetFocus() end
+			end)
 		end
 		if ChatEdit_DeactivateChat then
 			hooksecurefunc("ChatEdit_DeactivateChat", function()
-				C_Timer.After(0, FadeUI.UpdateChatPeek)
+				C_Timer.After(0, function()
+					FadeUI.ChatActivity()
+					FadeUI.UpdateChatPeek()
+				end)
 			end)
+		end
+		-- New lines in a chat window you can see (the selected tab, or an undocked
+		-- window) count as chat activity.
+		for i = 1, 10 do
+			local f = GetFrame("ChatFrame" .. i)
+			if f and f.AddMessage then
+				hooksecurefunc(f, "AddMessage", function(self)
+					if self:IsShown() then FadeUI.ChatActivity() end
+				end)
+			end
 		end
 
 		if EventRegistry and EventRegistry.RegisterCallback then

@@ -338,6 +338,17 @@ local function Build()
 	Tooltip(refs.macro, "Keep settings in a macro",
 		"The Forever beta client currently forgets addon settings when the game restarts. This keeps a copy in one general macro (named FadeUI...) and reads it back at login. You can turn it off once Blizzard fixes saved settings.")
 
+	-- Chat idle, in seconds
+	local idleUnit = Text(win, "GameFontHighlightSmall", "s", MUTED)
+	idleUnit:SetPoint("TOPRIGHT", -PAD, y - 1)
+	local idle = SecondsBox(win, "chatIdle")
+	idle:SetPoint("RIGHT", idleUnit, "LEFT", -3, 0)
+	local idleLabel = Text(win, "GameFontHighlight", "Chat idle:")
+	idleLabel:SetPoint("RIGHT", idle, "LEFT", -6, 0)
+	Tooltip(idle, "Chat idle",
+		"Seconds without a new message in the chat window you're looking at, or typing, before chat hides. It comes back with the next message. 0 = never hide for being idle.")
+	refs.fade[#refs.fade + 1] = idle
+
 	-- Status line
 	y = y - 26
 	refs.status = Text(win, "GameFontHighlightSmall", "", MUTED)
