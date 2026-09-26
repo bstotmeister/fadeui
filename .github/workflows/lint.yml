@@ -1,0 +1,18 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  luacheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Uses .luacheckrc for the WoW globals.
+      - uses: lunarmodules/luacheck@v1
+        with:
+          args: FadeUI

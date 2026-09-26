@@ -23,6 +23,12 @@ scripts/link.sh _retail_       # or any other flavor folder
 
 Set `WOW_DIR` if WoW isn't installed at `/Applications/World of Warcraft`.
 
+## Checks
+
+Every push and pull request to `develop` or `main` runs [luacheck](https://github.com/lunarmodules/luacheck)
+on `FadeUI/` (config in `.luacheckrc`). `main` only accepts changes through a pull request that passes it.
+Work happens on branches off `develop`, and `develop` is merged into `main` for releases.
+
 ## Releasing
 
 Bump `## Version` in `FadeUI/FadeUI.toc`, then push a tag:
