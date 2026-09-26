@@ -273,9 +273,10 @@ end
 
 -- Chat is shown while you type, and hidden once it has been idle (see ChatIdleCheck).
 local chatIdle = false
+local chatTyping -- the chat edit box being typed in, if any
 
 local function ChatState(state)
-	if ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow() then return "show" end
+	if chatTyping then return "show" end
 	if chatIdle then return "hide" end
 	return state
 end
@@ -301,6 +302,11 @@ local function Holder_State(h, state, now)
 		FinishHide(h)
 	elseif h:IsShown() and fading[h] ~= 0 then
 		local delay = now and 0 or (db.fadeDelay or 0) / 10
+		if h.fadeuiChat and (db.chatIdle or 0) > 0 then
+			-- Chat stays until it has been idle long enough; ChatIdleCheck then hides it.
+			if not chatIdle then return end
+			delay = 0
+		end
 		if delay > 0 then
 			h.fadeuiTimer = C_Timer.NewTimer(delay, function() StartFadeOut(h) end)
 		else
@@ -784,24 +790,31 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		if mirror.macrosSeen then MirrorReady() else TryRestore() end
 		FadeUI.Apply()
 
-		if ChatEdit_ActivateChat then
-			hooksecurefunc("ChatEdit_ActivateChat", function(editBox)
+		-- Typing: a chat edit box asked to take focus (Enter, /, reply...) brings
+		-- chat back. It may have been hidden with chat, so it's focused again once shown.
+		local function StartTyping(box)
+			if chatTyping == box then return end
+			chatTyping = box
+			FadeUI.UpdateChatPeek()
+			if not box:HasFocus() then box:SetFocus() end
+		end
+		local function StopTyping(box)
+			C_Timer.After(0, function()
+				if chatTyping ~= box or box:HasFocus() then return end
+				chatTyping = nil
+				FadeUI.ChatActivity()
 				FadeUI.UpdateChatPeek()
-				-- The box may have been hidden (with chat) when it was asked to take focus.
-				if editBox and editBox.HasFocus and not editBox:HasFocus() then editBox:SetFocus() end
 			end)
 		end
-		if ChatEdit_DeactivateChat then
-			hooksecurefunc("ChatEdit_DeactivateChat", function()
-				C_Timer.After(0, function()
-					FadeUI.ChatActivity()
-					FadeUI.UpdateChatPeek()
-				end)
-			end)
-		end
-		-- New lines in a chat window you can see (the selected tab, or an undocked
-		-- window) count as chat activity.
 		for i = 1, 10 do
+			local box = GetFrame("ChatFrame" .. i .. "EditBox")
+			if box and box.SetFocus then
+				hooksecurefunc(box, "SetFocus", StartTyping)
+				box:HookScript("OnEditFocusGained", StartTyping)
+				box:HookScript("OnEditFocusLost", StopTyping)
+			end
+			-- New lines in a chat window you can see (the selected tab, or an
+			-- undocked window) count as chat activity.
 			local f = GetFrame("ChatFrame" .. i)
 			if f and f.AddMessage then
 				hooksecurefunc(f, "AddMessage", function(self)

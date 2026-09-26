@@ -21,9 +21,6 @@ globals = {
 -- WoW API it reads. Add new ones here as the addon starts using them.
 read_globals = {
 	"C_Timer",
-	"ChatEdit_ActivateChat",
-	"ChatEdit_DeactivateChat",
-	"ChatEdit_GetActiveWindow",
 	"CreateFrame",
 	"CreateMacro",
 	"DEFAULT_CHAT_FRAME",
