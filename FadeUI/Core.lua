@@ -13,6 +13,10 @@
 --   Moving protected frames is only allowed out of combat, so setting changes made
 --   during a fight are applied as soon as the fight ends.
 --
+--   Out of combat, a unit frame also pops up while its unit's health or power is
+--   away from where it rests (full health; full mana or energy, empty rage) by
+--   more than the pop-up threshold.
+--
 --   While Edit Mode is open, or FadeUI is switched off, every element is put back
 --   under its original parent: your normal UI, untouched.
 
@@ -107,12 +111,12 @@ FadeUI.GROUPS = {
 		{ id = 10, key = "petbar", label = "Pet Bar",            frames = { "PetActionBar" },        default = "never" },
 	}},
 	{ title = "Unit frames", items = {
-		{ id = 11, key = "player",  label = "Player Frame",      frames = { "PlayerFrame" },         default = "target" },
-		{ id = 12, key = "pet",     label = "Pet Frame",         frames = { "PetFrame" },            default = "target" },
-		{ id = 13, key = "target",  label = "Target Frame",      frames = { "TargetFrame" },         default = "target" },
+		{ id = 11, key = "player",  label = "Player Frame",      frames = { "PlayerFrame" },         default = "target", unit = "player" },
+		{ id = 12, key = "pet",     label = "Pet Frame",         frames = { "PetFrame" },            default = "target", unit = "pet" },
+		{ id = 13, key = "target",  label = "Target Frame",      frames = { "TargetFrame" },         default = "target", unit = "target" },
 		{ id = 14, key = "tot",     label = "Target of Target",  frames = { "TargetFrameToT" },      default = "target",
 		  note = "Sits inside the Target Frame, so it is also hidden whenever that is." },
-		{ id = 15, key = "focus",   label = "Focus Frame",       frames = { "FocusFrame" },          default = "target" },
+		{ id = 15, key = "focus",   label = "Focus Frame",       frames = { "FocusFrame" },          default = "target", unit = "focus" },
 		{ id = 16, key = "castbar", label = "Cast Bar",          frames = { "PlayerCastingBarFrame" }, default = "always", direct = true,
 		  note = "Only appears while you cast anyway. If it is locked to the Player Frame in Edit Mode, it hides with that frame too." },
 		{ id = 31, key = "swing",   label = "Swing Timers",      frames = { "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" }, default = "combat" },
@@ -138,13 +142,14 @@ FadeUI.GROUPS = {
 	}},
 }
 
-local ELEMENTS, BY_KEY, BY_ID, MAX_ID = {}, {}, {}, 0
+local ELEMENTS, BY_KEY, BY_ID, BY_UNIT, MAX_ID = {}, {}, {}, {}, 0
 for _, group in ipairs(FadeUI.GROUPS) do
 	for _, el in ipairs(group.items) do
 		el.modes = el.modes or FadeUI.MODES
 		ELEMENTS[#ELEMENTS + 1] = el
 		BY_KEY[el.key] = el
 		BY_ID[el.id] = el
+		if el.unit then BY_UNIT[el.unit] = el end
 		if el.id > MAX_ID then MAX_ID = el.id end
 	end
 end
@@ -165,6 +170,7 @@ local function Defaults(target)
 	target.fadeOut = 5    -- fade-out time, tenths of a second (0 = instant)
 	target.fadeDelay = 50 -- wait before fading out, tenths of a second
 	target.chatIdle = 100 -- "When active" chat hides after this long without activity, tenths of a second
+	target.threshold = 5  -- unit frames pop up when health/power is off its resting value by more than this, percent (0 = off)
 	target.macro = true   -- keep a copy of the settings in a macro (beta workaround)
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
@@ -186,8 +192,8 @@ function FadeUI.GetDB() return db end
 FadeUI.MAX_TIME = 999 -- tenths of a second; three digits in the settings macro
 
 -- Compact form used by the settings macro: version, on/off, fade-in, fade-out,
--- fade-out delay, chat idle (three digits each), then one mode letter per
--- element id ("_" = unknown).
+-- fade-out delay, chat idle, pop-up threshold (three digits each), then one mode
+-- letter per element id ("_" = unknown).
 function FadeUI.Encode()
 	local codes = {}
 	for id = 1, MAX_ID do
@@ -196,13 +202,17 @@ function FadeUI.Encode()
 		codes[id] = m and m.code or "_"
 	end
 	local function t(v) return math.min(FadeUI.MAX_TIME, math.max(0, v or 0)) end
-	return ("4%d%03d%03d%03d%03d%s"):format(db.enabled and 1 or 0,
-		t(db.fadeIn), t(db.fadeOut), t(db.fadeDelay), t(db.chatIdle), table.concat(codes))
+	return ("5%d%03d%03d%03d%03d%03d%s"):format(db.enabled and 1 or 0,
+		t(db.fadeIn), t(db.fadeOut), t(db.fadeDelay), t(db.chatIdle), t(db.threshold), table.concat(codes))
 end
 
 function FadeUI.Decode(s)
 	if type(s) ~= "string" or not db then return false end
-	local enabled, fadeIn, fadeOut, delay, chatIdle, codes = s:match("^4([01])(%d%d%d)(%d%d%d)(%d%d%d)(%d%d%d)([%u_]*)")
+	local enabled, fadeIn, fadeOut, delay, chatIdle, threshold, codes = s:match("^5([01])(%d%d%d)(%d%d%d)(%d%d%d)(%d%d%d)(%d%d%d)([%u_]*)")
+	if not enabled then
+		-- version 4: no pop-up threshold
+		enabled, fadeIn, fadeOut, delay, chatIdle, codes = s:match("^4([01])(%d%d%d)(%d%d%d)(%d%d%d)(%d%d%d)([%u_]*)")
+	end
 	if not enabled then
 		-- version 3: no chat idle
 		enabled, fadeIn, fadeOut, delay, codes = s:match("^3([01])(%d%d%d)(%d%d%d)(%d%d%d)([ACTON_]*)")
@@ -219,6 +229,7 @@ function FadeUI.Decode(s)
 		db.fadeDelay = tonumber(delay)
 	end
 	if chatIdle then db.chatIdle = tonumber(chatIdle) end
+	if threshold then db.threshold = math.min(100, tonumber(threshold)) end
 	for id = 1, #codes do
 		local el = BY_ID[id]
 		local m = el and el.modes.byCode[codes:sub(id, id)]
@@ -305,6 +316,7 @@ end
 -- `now` skips the fade-out delay.
 local function Holder_State(h, state, now)
 	if h.fadeuiChat then state = ChatState(state) end
+	if state == "hide" and h.fadeuiEl and h.fadeuiEl.alert and not InCombatLockdown() then state = "show" end
 	if h.fadeuiTimer then
 		h.fadeuiTimer:Cancel()
 		h.fadeuiTimer = nil
@@ -524,10 +536,9 @@ local function GetFrame(name)
 	end
 end
 
--- Chat comes back while you type, so you can see what you're writing, and
--- hides once it has been idle (see ChatState).
-function FadeUI.UpdateChatPeek()
-	local el = BY_KEY.chat
+-- Runs an element's holders through Holder_State again, after something other
+-- than its state driver (chat typing or idle, a unit frame alert) changed.
+local function Reevaluate(el)
 	if not el or not db or not loggedIn then return end
 	for _, name in ipairs(el.frames) do
 		local f = GetFrame(name)
@@ -538,6 +549,12 @@ function FadeUI.UpdateChatPeek()
 			Holder_State(h, state, true)
 		end
 	end
+end
+
+-- Chat comes back while you type, so you can see what you're writing, and
+-- hides once it has been idle (see ChatState).
+function FadeUI.UpdateChatPeek()
+	Reevaluate(BY_KEY.chat)
 end
 
 -- Chat is idle once the shown chat window has had no new message, and you
@@ -563,6 +580,42 @@ function FadeUI.ChatActivity()
 	chatLastActive = GetTime()
 	-- A pending timer re-checks the time itself when it fires.
 	if chatIdle or not chatTimer then ChatIdleCheck() end
+end
+
+-- A unit frame pops up while its unit's health or power is off its resting
+-- value by more than db.threshold. Only checked out of combat: protected frames
+-- can't be shown in combat anyway. Secret values (which addon code can't do
+-- math on) are skipped.
+local POWER_RESTS_EMPTY = { [1] = true, [6] = true } -- rage, runic power
+
+local function IsSecret(v)
+	return issecretvalue ~= nil and issecretvalue(v)
+end
+
+local function OffBy(cur, max, restsEmpty)
+	if IsSecret(cur) or IsSecret(max) or not max or max <= 0 then return 0 end
+	return restsEmpty and cur / max or 1 - cur / max
+end
+
+local function UnitAlert(unit)
+	local t = (db.threshold or 0) / 100
+	if t <= 0 or not UnitExists(unit) or UnitIsDeadOrGhost(unit) then return false end
+	if OffBy(UnitHealth(unit), UnitHealthMax(unit)) > t then return true end
+	return OffBy(UnitPower(unit), UnitPowerMax(unit), POWER_RESTS_EMPTY[UnitPowerType(unit)]) > t
+end
+
+-- `force` re-runs the holders even if the alert didn't change.
+function FadeUI.UpdateAlert(el, force)
+	if not db or not loggedIn or InCombatLockdown() then return end
+	local alert = UnitAlert(el.unit)
+	if alert ~= el.alert or force then
+		el.alert = alert
+		Reevaluate(el)
+	end
+end
+
+function FadeUI.UpdateAlerts(force)
+	for _, el in pairs(BY_UNIT) do FadeUI.UpdateAlert(el, force) end
 end
 
 -------------------------------------------------------------------------------
@@ -593,6 +646,7 @@ function FadeUI.Apply()
 				if active then
 					local h = (el.direct and AttachDirect or Attach)(f)
 					h.fadeuiChat = el.key == "chat"
+					h.fadeuiEl = el.unit and el or nil
 					SetDriver(h, mode.driver)
 				else
 					Detach(f)
@@ -603,6 +657,7 @@ function FadeUI.Apply()
 
 	ChatIdleCheck()
 	FadeUI.UpdateChatPeek()
+	FadeUI.UpdateAlerts(true)
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 end
 
@@ -750,6 +805,13 @@ function FadeUI.SetTime(field, seconds)
 	FadeUI.Changed()
 end
 
+-- Unit frame pop-up threshold, whole percent (0 = off).
+function FadeUI.SetThreshold(percent)
+	if not db or type(percent) ~= "number" then return end
+	db.threshold = math.min(100, math.max(0, math.floor(percent + 0.5)))
+	FadeUI.Changed()
+end
+
 function FadeUI.ResetDefaults()
 	local keepMacro = db.macro
 	Defaults(db)
@@ -784,6 +846,10 @@ events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("PLAYER_REGEN_DISABLED")
 events:RegisterEvent("PLAYER_REGEN_ENABLED")
 events:RegisterEvent("UPDATE_MACROS")
+for _, e in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER",
+	"UNIT_DISPLAYPOWER", "UNIT_PET", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED" }) do
+	events:RegisterEvent(e)
+end
 
 events:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
@@ -864,8 +930,21 @@ events:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "PLAYER_REGEN_DISABLED" then
 		if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 
+	elseif event == "PLAYER_TARGET_CHANGED" then
+		FadeUI.UpdateAlert(BY_UNIT.target)
+
+	elseif event == "PLAYER_FOCUS_CHANGED" then
+		FadeUI.UpdateAlert(BY_UNIT.focus)
+
+	elseif event == "UNIT_PET" then
+		if arg1 == "player" then FadeUI.UpdateAlert(BY_UNIT.pet) end
+
+	elseif event:sub(1, 5) == "UNIT_" then
+		if BY_UNIT[arg1] then FadeUI.UpdateAlert(BY_UNIT[arg1]) end
+
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if FadeUI.pendingApply then FadeUI.Apply() end
+		FadeUI.UpdateAlerts(true) -- alerts aren't checked in combat
 		if mirror.pendingWrite then WriteMacro() end
 		if mirror.pendingDelete then DeleteSettingsMacro() end
 		if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end

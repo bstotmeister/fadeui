@@ -113,8 +113,9 @@ local function Checkbox(parent, label, onClick)
 	return c
 end
 
--- A small box for a number of seconds. `field` is the setting it edits.
-local function SecondsBox(parent, field)
+-- A small box for a number of seconds. `field` is the setting it edits; `set`
+-- (optional) stores a typed value instead of FadeUI.SetTime.
+local function SecondsBox(parent, field, set)
 	local e = CreateFrame("EditBox", nil, parent)
 	e:SetSize(40, SEG_H)
 	e:SetAutoFocus(false)
@@ -124,13 +125,14 @@ local function SecondsBox(parent, field)
 	Fill(e, "BACKGROUND", BTN)
 	Outline(e, LINE)
 	e.field = field
+	e.set = set or FadeUI.SetTime
 	e:SetScript("OnEnterPressed", e.ClearFocus)
 	e:SetScript("OnEscapePressed", function(self)
 		self.cancel = true
 		self:ClearFocus()
 	end)
 	e:SetScript("OnEditFocusLost", function(self)
-		if not self.cancel then FadeUI.SetTime(self.field, tonumber(self:GetText())) end
+		if not self.cancel then self.set(self.field, tonumber(self:GetText())) end
 		self.cancel = nil
 		FadeUI.RefreshOptions() -- shows the stored value (rounded, clamped, or unchanged)
 	end)
@@ -352,6 +354,16 @@ local function Build()
 	Tooltip(refs.macro, "Keep settings in a macro",
 		"The Forever beta client currently forgets addon settings when the game restarts. This keeps a copy in one general macro (named FadeUI...) and reads it back at login. You can turn it off once Blizzard fixes saved settings.")
 
+	-- Unit frame pop-up threshold, in percent
+	local pctUnit = Text(win, "GameFontHighlightSmall", "%", MUTED)
+	pctUnit:SetPoint("TOPRIGHT", -PAD, y - 1)
+	refs.threshold = SecondsBox(win, "threshold", function(_, v) FadeUI.SetThreshold(v) end)
+	refs.threshold:SetPoint("RIGHT", pctUnit, "LEFT", -3, 0)
+	local pctLabel = Text(win, "GameFontHighlight", "Unit frame pop-up:")
+	pctLabel:SetPoint("RIGHT", refs.threshold, "LEFT", -6, 0)
+	Tooltip(refs.threshold, "Unit frame pop-up",
+		"Out of combat, the Player, Pet, Target and Focus frames show whatever their setting, while that unit's health or power is off by more than this: health below full, mana or energy below full, rage above empty. 0 = off.")
+
 	-- Status line
 	y = y - 26
 	refs.status = Text(win, "GameFontHighlightSmall", "", MUTED)
@@ -431,6 +443,7 @@ function FadeUI.RefreshOptions()
 	for _, e in ipairs(refs.fade) do
 		if not e:HasFocus() then e:SetText(("%g"):format((db[e.field] or 0) / 10)) end
 	end
+	if not refs.threshold:HasFocus() then refs.threshold:SetText(db.threshold or 0) end
 
 	for _, row in ipairs(rows) do
 		local current = db.modes[row.el.key]
