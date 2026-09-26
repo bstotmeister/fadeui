@@ -89,14 +89,15 @@ FadeUI.GROUPS = {
 		{ id = 10, key = "petbar", label = "Pet Bar",            frames = { "PetActionBar" },        default = "never" },
 	}},
 	{ title = "Unit frames", items = {
-		{ id = 11, key = "player",  label = "Player Frame",      frames = { "PlayerFrame" },         default = "combat" },
-		{ id = 12, key = "pet",     label = "Pet Frame",         frames = { "PetFrame" },            default = "combat" },
-		{ id = 13, key = "target",  label = "Target Frame",      frames = { "TargetFrame" },         default = "combat" },
-		{ id = 14, key = "tot",     label = "Target of Target",  frames = { "TargetFrameToT" },      default = "combat",
+		{ id = 11, key = "player",  label = "Player Frame",      frames = { "PlayerFrame" },         default = "always" },
+		{ id = 12, key = "pet",     label = "Pet Frame",         frames = { "PetFrame" },            default = "always" },
+		{ id = 13, key = "target",  label = "Target Frame",      frames = { "TargetFrame" },         default = "always" },
+		{ id = 14, key = "tot",     label = "Target of Target",  frames = { "TargetFrameToT" },      default = "always",
 		  note = "Sits inside the Target Frame, so it is also hidden whenever that is." },
-		{ id = 15, key = "focus",   label = "Focus Frame",       frames = { "FocusFrame" },          default = "combat" },
+		{ id = 15, key = "focus",   label = "Focus Frame",       frames = { "FocusFrame" },          default = "always" },
 		{ id = 16, key = "castbar", label = "Cast Bar",          frames = { "PlayerCastingBarFrame" }, default = "always", direct = true,
 		  note = "Only appears while you cast anyway. If it is locked to the Player Frame in Edit Mode, it hides with that frame too." },
+		{ id = 31, key = "swing",   label = "Swing Timers",      frames = { "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" }, default = "combat" },
 		{ id = 17, key = "boss",    label = "Boss Frames",       frames = { "BossTargetFrameContainer" }, default = "always" },
 	}},
 	{ title = "Group frames", items = {
@@ -105,11 +106,11 @@ FadeUI.GROUPS = {
 		{ id = 20, key = "raidmgr", label = "Raid Manager Tab",  frames = { "CompactRaidFrameManager" },   default = "never" },
 	}},
 	{ title = "Everything else", items = {
-		{ id = 21, key = "minimap", label = "Minimap",           frames = { "MinimapCluster" },      default = "never" },
-		{ id = 22, key = "buffs",   label = "Buffs",             frames = { "BuffFrame" },           default = "never" },
+		{ id = 21, key = "minimap", label = "Minimap",           frames = { "MinimapCluster" },      default = "target" },
+		{ id = 22, key = "buffs",   label = "Buffs",             frames = { "BuffFrame" },           default = "target" },
 		{ id = 23, key = "debuffs", label = "Debuffs",           frames = { "DebuffFrame" },         default = "combat" },
-		{ id = 24, key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "never", direct = true },
-		{ id = 25, key = "chat",    label = "Chat",              frames = CHAT_FRAMES,               default = "never",
+		{ id = 24, key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "target", direct = true },
+		{ id = 25, key = "chat",    label = "Chat",              frames = CHAT_FRAMES,               default = "always",
 		  note = "Chat always comes back while you are typing a message." },
 		{ id = 26, key = "micro",   label = "Menu Buttons",      frames = { "MicroMenuContainer" },  default = "never" },
 		{ id = 27, key = "bags",    label = "Bag Buttons",       frames = { "BagsBar" },             default = "never" },
@@ -141,9 +142,9 @@ local loggedIn = false
 
 local function Defaults(target)
 	target.enabled = true -- FadeUI on (the Alt-Z-like state)
-	target.fadeIn = 2     -- fade-in time, tenths of a second (0 = instant)
-	target.fadeOut = 0    -- fade-out time, tenths of a second (0 = instant)
-	target.fadeDelay = 0  -- wait before fading out, tenths of a second
+	target.fadeIn = 5     -- fade-in time, tenths of a second (0 = instant)
+	target.fadeOut = 5    -- fade-out time, tenths of a second (0 = instant)
+	target.fadeDelay = 50 -- wait before fading out, tenths of a second
 	target.macro = true   -- keep a copy of the settings in a macro (beta workaround)
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
