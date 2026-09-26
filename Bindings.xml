@@ -1,0 +1,8 @@
+<Bindings>
+	<Binding name="FADEUI_TOGGLE" header="FADEUI" category="ADDONS">
+		FadeUI_Toggle()
+	</Binding>
+	<Binding name="FADEUI_OPTIONS" category="ADDONS">
+		FadeUI_OpenOptions()
+	</Binding>
+</Bindings>
