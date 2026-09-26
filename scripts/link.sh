@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Symlink this repo into a WoW client's AddOns folder so edits show up after /reload.
+# Symlink the addon folder (FadeUI/) into a WoW client's AddOns folder so edits show up after /reload.
 # Usage: scripts/link.sh [flavor]   (default: _classic_beta_; e.g. _retail_, _classic_era_)
 set -euo pipefail
 
@@ -20,5 +20,5 @@ elif [ -e "$TARGET" ]; then
 	mv "$TARGET" "$backup"
 fi
 
-ln -s "$REPO" "$TARGET"
-echo "Linked $TARGET -> $REPO"
+ln -s "$REPO/FadeUI" "$TARGET"
+echo "Linked $TARGET -> $REPO/FadeUI"

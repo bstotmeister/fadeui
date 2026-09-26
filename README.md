@@ -14,7 +14,7 @@ and keybinds keep working on hidden bars.
 
 ## Development
 
-Symlink the repo into your WoW client so changes load on `/reload`:
+Addon source lives in `FadeUI/`. Symlink it into your WoW client so changes load on `/reload`:
 
 ```sh
 scripts/link.sh                # _classic_beta_ (default)
@@ -25,7 +25,7 @@ Set `WOW_DIR` if WoW isn't installed at `/Applications/World of Warcraft`.
 
 ## Releasing
 
-Bump `## Version` in `FadeUI.toc`, then push a tag:
+Bump `## Version` in `FadeUI/FadeUI.toc`, then push a tag:
 
 ```sh
 git tag v2.0.1 && git push origin v2.0.1

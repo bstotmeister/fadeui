@@ -1,7 +1,9 @@
 package-as: FadeUI
 
+# The addon lives in FadeUI/; flatten it into the package root.
+move-folders:
+  FadeUI/FadeUI: FadeUI
+
 ignore:
   - README.md
   - scripts
-  - .luarc.json
-  - .github
