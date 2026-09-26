@@ -15,9 +15,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Builds FadeUI-<tag>.zip and attaches it to a GitHub release.
-      # To also upload to CurseForge/Wago, add CF_API_KEY / WAGO_API_TOKEN secrets
-      # and "## X-Curse-Project-ID" / "## X-Wago-ID" lines to FadeUI.toc.
+      # Builds FadeUI-<tag>.zip, attaches it to a GitHub release, and uploads it to
+      # CurseForge (project ID from FadeUI.toc) when the CF_API_KEY secret is set.
       - uses: BigWigsMods/packager@v2
         env:
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
