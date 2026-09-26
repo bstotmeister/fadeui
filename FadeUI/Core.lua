@@ -50,12 +50,29 @@ FadeUI.MODES = {
 	  tip = "Always hidden while FadeUI is on. Keybinds still work.",
 	  color = { 0.36, 0.36, 0.40 }, driver = "hide" },
 }
-local MODE, MODE_BY_CODE = {}, {}
-for i, m in ipairs(FadeUI.MODES) do
-	m.index = i
-	MODE[m.key] = m
-	MODE_BY_CODE[m.code] = m
+-- Chat has its own modes: it hides when idle rather than by combat state.
+FadeUI.CHAT_MODES = {
+	{ key = "always", code = "A", label = "Always",
+	  tip = "Always shown, like the normal UI.",
+	  color = { 0.24, 0.55, 0.30 }, driver = "show" },
+	{ key = "active", code = "W", label = "When active",
+	  tip = "Hides once the chat window you're looking at has had no new message, and you haven't typed, for the idle time. The next message brings it back.",
+	  color = { 0.22, 0.44, 0.75 }, driver = "show" },
+	{ key = "typing", code = "Y", label = "While typing",
+	  tip = "Hidden except while you type a message.",
+	  color = { 0.36, 0.36, 0.40 }, driver = "hide" },
+}
+
+-- Each list gets lookups by key and by settings-macro code.
+for _, list in ipairs({ FadeUI.MODES, FadeUI.CHAT_MODES }) do
+	list.byKey, list.byCode = {}, {}
+	for i, m in ipairs(list) do
+		m.index = i
+		list.byKey[m.key] = m
+		list.byCode[m.code] = m
+	end
 end
+local MODE = FadeUI.MODES.byKey
 FadeUI.MODE = MODE
 
 -------------------------------------------------------------------------------
@@ -111,8 +128,8 @@ FadeUI.GROUPS = {
 		{ id = 22, key = "buffs",   label = "Buffs",             frames = { "BuffFrame" },           default = "target" },
 		{ id = 23, key = "debuffs", label = "Debuffs",           frames = { "DebuffFrame" },         default = "combat" },
 		{ id = 24, key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "target", direct = true },
-		{ id = 25, key = "chat",    label = "Chat",              frames = CHAT_FRAMES,               default = "always",
-		  note = "Chat always comes back while you are typing a message. It can also hide after a while with no new messages (Chat idle, at the top)." },
+		{ id = 25, key = "chat",    label = "Chat",              frames = CHAT_FRAMES,               default = "active", modes = FadeUI.CHAT_MODES,
+		  note = "Chat always comes back while you are typing a message." },
 		{ id = 26, key = "micro",   label = "Menu Buttons",      frames = { "MicroMenuContainer" },  default = "never" },
 		{ id = 27, key = "bags",    label = "Bag Buttons",       frames = { "BagsBar" },             default = "never" },
 		{ id = 28, key = "xp",      label = "XP / Rep Bars",     frames = { "MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer" }, default = "never" },
@@ -124,6 +141,7 @@ FadeUI.GROUPS = {
 local ELEMENTS, BY_KEY, BY_ID, MAX_ID = {}, {}, {}, 0
 for _, group in ipairs(FadeUI.GROUPS) do
 	for _, el in ipairs(group.items) do
+		el.modes = el.modes or FadeUI.MODES
 		ELEMENTS[#ELEMENTS + 1] = el
 		BY_KEY[el.key] = el
 		BY_ID[el.id] = el
@@ -146,7 +164,7 @@ local function Defaults(target)
 	target.fadeIn = 5     -- fade-in time, tenths of a second (0 = instant)
 	target.fadeOut = 5    -- fade-out time, tenths of a second (0 = instant)
 	target.fadeDelay = 50 -- wait before fading out, tenths of a second
-	target.chatIdle = 300 -- hide chat after this long without activity, tenths of a second (0 = off)
+	target.chatIdle = 300 -- "When active" chat hides after this long without activity, tenths of a second
 	target.macro = true   -- keep a copy of the settings in a macro (beta workaround)
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
@@ -159,7 +177,7 @@ local function FillMissing(t)
 		if t[k] == nil then t[k] = v end
 	end
 	for key, mode in pairs(d.modes) do
-		if not MODE[t.modes[key] or ""] then t.modes[key] = mode end
+		if not BY_KEY[key].modes.byKey[t.modes[key] or ""] then t.modes[key] = mode end
 	end
 end
 
@@ -174,7 +192,7 @@ function FadeUI.Encode()
 	local codes = {}
 	for id = 1, MAX_ID do
 		local el = BY_ID[id]
-		local m = el and MODE[db.modes[el.key]]
+		local m = el and el.modes.byKey[db.modes[el.key]]
 		codes[id] = m and m.code or "_"
 	end
 	local function t(v) return math.min(FadeUI.MAX_TIME, math.max(0, v or 0)) end
@@ -184,7 +202,7 @@ end
 
 function FadeUI.Decode(s)
 	if type(s) ~= "string" or not db then return false end
-	local enabled, fadeIn, fadeOut, delay, chatIdle, codes = s:match("^4([01])(%d%d%d)(%d%d%d)(%d%d%d)(%d%d%d)([ACTON_]*)")
+	local enabled, fadeIn, fadeOut, delay, chatIdle, codes = s:match("^4([01])(%d%d%d)(%d%d%d)(%d%d%d)(%d%d%d)([%u_]*)")
 	if not enabled then
 		-- version 3: no chat idle
 		enabled, fadeIn, fadeOut, delay, codes = s:match("^3([01])(%d%d%d)(%d%d%d)(%d%d%d)([ACTON_]*)")
@@ -202,7 +220,8 @@ function FadeUI.Decode(s)
 	end
 	if chatIdle then db.chatIdle = tonumber(chatIdle) end
 	for id = 1, #codes do
-		local el, m = BY_ID[id], MODE_BY_CODE[codes:sub(id, id)]
+		local el = BY_ID[id]
+		local m = el and el.modes.byCode[codes:sub(id, id)]
 		if el and m then db.modes[el.key] = m.key end
 	end
 	return true
@@ -302,11 +321,6 @@ local function Holder_State(h, state, now)
 		FinishHide(h)
 	elseif h:IsShown() and fading[h] ~= 0 then
 		local delay = now and 0 or (db.fadeDelay or 0) / 10
-		if h.fadeuiChat and (db.chatIdle or 0) > 0 then
-			-- Chat stays until it has been idle long enough; ChatIdleCheck then hides it.
-			if not chatIdle then return end
-			delay = 0
-		end
 		if delay > 0 then
 			h.fadeuiTimer = C_Timer.NewTimer(delay, function() StartFadeOut(h) end)
 		else
@@ -535,7 +549,7 @@ local function ChatIdleCheck()
 		chatTimer:Cancel()
 		chatTimer = nil
 	end
-	local timeout = db and (db.chatIdle or 0) / 10 or 0
+	local timeout = db and db.modes.chat == "active" and (db.chatIdle or 0) / 10 or 0
 	local left = chatLastActive + timeout - GetTime()
 	if timeout > 0 and left > 0 then chatTimer = C_Timer.NewTimer(left, ChatIdleCheck) end
 	local idle = timeout > 0 and left <= 0
@@ -571,7 +585,7 @@ function FadeUI.Apply()
 	local active = FadeUI.IsActive()
 	for _, el in ipairs(ELEMENTS) do
 		el.found = 0
-		local mode = MODE[db.modes[el.key]] or MODE.always
+		local mode = el.modes.byKey[db.modes[el.key]] or el.modes.byKey.always
 		for _, name in ipairs(el.frames) do
 			local f = GetFrame(name)
 			if f then
@@ -707,14 +721,16 @@ function FadeUI.Changed()
 end
 
 function FadeUI.SetMode(key, mode)
-	if not (db and BY_KEY[key] and MODE[mode]) then return end
+	if not (db and BY_KEY[key] and BY_KEY[key].modes.byKey[mode]) then return end
 	db.modes[key] = mode
 	FadeUI.Changed()
 end
 
 function FadeUI.SetAll(mode)
 	if not (db and MODE[mode]) then return end
-	for _, el in ipairs(ELEMENTS) do db.modes[el.key] = mode end
+	for _, el in ipairs(ELEMENTS) do
+		if el.modes.byKey[mode] then db.modes[el.key] = mode end -- chat only takes the modes it has
+	end
 	FadeUI.Changed()
 end
 
