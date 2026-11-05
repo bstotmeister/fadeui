@@ -234,6 +234,18 @@ local function ElementRow(parent, el)
 		refs.fade[#refs.fade + 1] = row.idle
 	end
 
+	-- Bag buttons' "while open" switch sits on a line of its own, below the row
+	-- (Layout leaves room for it).
+	if el.key == "bags" then
+		row.bagsOpen = Checkbox(row, "Also show while your bags are open", function(self)
+			FadeUI.SetBagsOpen(self:GetChecked())
+		end)
+		row.bagsOpen:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 24, 0)
+		Tooltip(row.bagsOpen, "Bag Buttons: while bags are open",
+			"Shows the bag buttons whenever a bag is open, whatever their mode above.")
+		row.extraH = 22
+	end
+
 	local function over() hl:Show() end
 	local function out() hl:Hide() end
 	name:HookScript("OnEnter", over) name:HookScript("OnLeave", out)
@@ -316,7 +328,7 @@ local function Layout(query)
 			cy = cy - GROUP_H
 			for _, row in ipairs(shown) do
 				row:SetPoint("TOPLEFT", 0, cy)
-				cy = cy - ROW_H
+				cy = cy - ROW_H - (row.extraH or 0)
 			end
 			cy = cy - 6
 		end
@@ -541,6 +553,10 @@ function FadeUI.RefreshOptions()
 			b:SetAlpha(missing and 0.45 or 1)
 		end
 		if row.idle then row.idle:SetAlpha(current == "active" and 1 or 0.45) end
+		if row.bagsOpen then
+			row.bagsOpen:SetChecked(db.bagsOpen)
+			row.bagsOpen:SetAlpha((missing or current == "always") and 0.45 or 1)
+		end
 		if missing then
 			row.label:SetText(row.el.label .. " |cff777777(not found)|r")
 			row.label:SetTextColor(0.5, 0.5, 0.5)

@@ -36,6 +36,7 @@ read_globals = {
 	"GetNumMacros",
 	"GetTime",
 	"InCombatLockdown",
+	"NUM_CONTAINER_FRAMES",
 	"RegisterStateDriver",
 	"SPELL_FAILED_OUT_OF_RANGE",
 	"SecureCmdOptionParse",

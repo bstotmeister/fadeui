@@ -162,6 +162,7 @@ local function Defaults(target)
 	target.fadeOut = 5    -- fade-out time, tenths of a second (0 = instant)
 	target.fadeDelay = 50 -- wait before fading out, tenths of a second
 	target.chatIdle = 100 -- "When active" chat hides after this long without activity, tenths of a second
+	target.bagsOpen = true -- bag buttons also show while your bags are open
 	target.rangeHelper = true    -- show a spell's icon after it fails out of range (RangeHelper.lua)
 	target.resourceHelper = true -- ...or short on mana/rage/energy
 	target.rangeTime = 80    -- the icon stays up this long after a range failure or target change, tenths of a second (0 = until cast)
@@ -282,11 +283,15 @@ local function ChatState(state)
 	return state
 end
 
+-- Bag buttons are shown while your bags are open, if db.bagsOpen (see BagsChanged).
+local bagsOpen = false
+
 -- The holder's state driver changed to "show" or "hide". Secure holders run
 -- STATE_SNIPPET first, which has already shown them (or hidden them in combat).
 -- `now` skips the fade-out delay.
 local function Holder_State(h, state, now)
 	if h.fadeuiChat then state = ChatState(state) end
+	if h.fadeuiBags and bagsOpen and db.bagsOpen then state = "show" end
 	if h.fadeuiTimer then
 		h.fadeuiTimer:Cancel()
 		h.fadeuiTimer = nil
@@ -506,10 +511,11 @@ local function GetFrame(name)
 	end
 end
 
--- Chat comes back while you type, so you can see what you're writing, and
--- hides once it has been idle (see ChatState).
-function FadeUI.UpdateChatPeek()
-	local el = BY_KEY.chat
+-- Re-checks an element that can show outside its mode: chat comes back while
+-- you type, so you can see what you're writing, and hides once it has been idle
+-- (see ChatState); bag buttons show while your bags are open.
+function FadeUI.UpdatePeek(key)
+	local el = BY_KEY[key]
 	if not el or not db or not loggedIn then return end
 	for _, name in ipairs(el.frames) do
 		local f = GetFrame(name)
@@ -537,7 +543,7 @@ local function ChatIdleCheck()
 	local idle = timeout > 0 and left <= 0
 	if idle ~= chatIdle then
 		chatIdle = idle
-		FadeUI.UpdateChatPeek()
+		FadeUI.UpdatePeek("chat")
 	end
 end
 
@@ -545,6 +551,27 @@ function FadeUI.ChatActivity()
 	chatLastActive = GetTime()
 	-- A pending timer re-checks the time itself when it fires.
 	if chatIdle or not chatTimer then ChatIdleCheck() end
+end
+
+-- Your bags are open while any bag window is shown.
+local BAG_FRAMES = { "ContainerFrameCombinedBags" }
+for i = 1, NUM_CONTAINER_FRAMES or 13 do
+	BAG_FRAMES[#BAG_FRAMES + 1] = "ContainerFrame" .. i
+end
+
+local function BagsChanged()
+	local open = false
+	for _, name in ipairs(BAG_FRAMES) do
+		local f = GetFrame(name)
+		if f and f:IsShown() then
+			open = true
+			break
+		end
+	end
+	if open ~= bagsOpen then
+		bagsOpen = open
+		FadeUI.UpdatePeek("bags")
+	end
 end
 
 -------------------------------------------------------------------------------
@@ -575,6 +602,7 @@ function FadeUI.Apply()
 				if active then
 					local h = (el.direct and AttachDirect or Attach)(f)
 					h.fadeuiChat = el.key == "chat"
+					h.fadeuiBags = el.key == "bags"
 					SetDriver(h, mode.driver)
 				else
 					Detach(f)
@@ -584,7 +612,8 @@ function FadeUI.Apply()
 	end
 
 	ChatIdleCheck()
-	FadeUI.UpdateChatPeek()
+	FadeUI.UpdatePeek("chat")
+	FadeUI.UpdatePeek("bags")
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 end
 
@@ -672,6 +701,12 @@ function FadeUI.SetEnabled(on)
 	FadeUI.Changed()
 end
 
+function FadeUI.SetBagsOpen(on)
+	if not db then return end
+	db.bagsOpen = on and true or false
+	FadeUI.Changed()
+end
+
 -- `field` is "fadeIn", "fadeOut", "fadeDelay", "chatIdle", "rangeTime" or "resourceTime"; `seconds` may be fractional.
 function FadeUI.SetTime(field, seconds)
 	if not db or type(seconds) ~= "number" then return end
@@ -750,7 +785,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		local function StartTyping(box)
 			if chatTyping == box then return end
 			chatTyping = box
-			FadeUI.UpdateChatPeek()
+			FadeUI.UpdatePeek("chat")
 			if not box:HasFocus() then box:SetFocus() end
 		end
 		local function StopTyping(box)
@@ -758,7 +793,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
 				if chatTyping ~= box or box:HasFocus() then return end
 				chatTyping = nil
 				FadeUI.ChatActivity()
-				FadeUI.UpdateChatPeek()
+				FadeUI.UpdatePeek("chat")
 			end)
 		end
 		for i = 1, 10 do
@@ -775,6 +810,15 @@ events:SetScript("OnEvent", function(_, event, arg1)
 				hooksecurefunc(f, "AddMessage", function(self)
 					if self:IsShown() then FadeUI.ChatActivity() end
 				end)
+			end
+		end
+
+		-- Opening or closing a bag re-checks the bag buttons.
+		for _, name in ipairs(BAG_FRAMES) do
+			local f = GetFrame(name)
+			if f then
+				f:HookScript("OnShow", BagsChanged)
+				f:HookScript("OnHide", BagsChanged)
 			end
 		end
 
