@@ -1,15 +1,18 @@
--- FadeUI range and resource helpers: with the action bars and cast bar hidden
--- there's no out-of-range or out-of-resource feedback, so when a spell fails
--- because of either, this shows that spell's icon. Each helper has its own
--- setting (rangeHelper, resourceHelper); they share the one icon.
+-- FadeUI range, resource and cooldown helpers: with the action bars and cast bar
+-- hidden there's no out-of-range, out-of-resource or cooldown feedback, so when
+-- a spell fails because of any of them, this shows that spell's icon. Each
+-- helper has its own setting (rangeHelper, resourceHelper, cooldownHelper); they
+-- share the one icon.
 --
 --   Range is the border: red out of range, green in range. Resource is the icon:
 --   dull (grayed and darker) while you're short on mana/rage/energy. Out of range
 --   with enough resource also tints the icon red; with both, the icon stays dull
 --   inside the red border, so both show. When it's ready it flashes and turns
---   normal. It hides when you cast that spell, or after the helper's time
---   (rangeTime, resourceTime) has passed since the last failure or target change
---   (so you can tab through targets to find one in range).
+--   normal. Cooldown is the action bars' sweep and countdown over the icon, with
+--   their bling when it ends. It hides when you cast that spell, or after the
+--   helper's time (rangeTime, resourceTime, cooldownTime) has passed since the
+--   last failure or target change (so you can tab through targets to find one in
+--   range).
 --
 --   /fui range (or Move in the options) unlocks the icon to drag it into place.
 --
@@ -25,7 +28,7 @@ local SIZE = 40
 local BORDER = 3       -- thick enough to read around a dull icon
 -- Each helper's setting for how long the icon stays up after the last failure
 -- or target change, in tenths of a second. 0 = until you cast the spell.
-local TIME_FIELD = { rangeHelper = "rangeTime", resourceHelper = "resourceTime" }
+local TIME_FIELD = { rangeHelper = "rangeTime", resourceHelper = "resourceTime", cooldownHelper = "cooldownTime" }
 local POLL = 0.1       -- seconds between range checks
 local PLACEHOLDER = "Interface\\Icons\\INV_Misc_QuestionMark"
 
@@ -39,7 +42,7 @@ local ACCENT = CreateColor(0.4, 0.8, 1)
 
 local issecret = issecretvalue or function() return false end
 
-local spell                  -- the spell shown: the last one that failed out of range or resource
+local spell                  -- the spell shown: the last one that failed out of range, resource or cooldown
 local failedSpell, failedAt  -- the player's last failed cast; its error follows right after
 local unlocked = false
 local active = false         -- up after a failed cast
@@ -68,6 +71,12 @@ icon:SetPoint("TOPLEFT", BORDER, -BORDER)
 icon:SetPoint("BOTTOMRIGHT", -BORDER, BORDER)
 icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
+-- The action bars' cooldown: sweep, countdown numbers (per the game's setting), bling.
+local cooldown = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
+cooldown:SetAllPoints(icon)
+cooldown:SetDrawEdge(false)
+cooldown:SetHideCountdownNumbers(false)
+
 local flash = f:CreateTexture(nil, "OVERLAY")
 flash:SetAllPoints(icon)
 flash:SetColorTexture(1, 1, 1, 0.6)
@@ -81,7 +90,7 @@ flashAnim:SetScript("OnFinished", function() flash:Hide() end)
 
 local label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 label:SetPoint("BOTTOM", f, "TOP", 0, 4)
-label:SetText("Range / resource")
+label:SetText("Range / resource / cooldown")
 
 local function Tint(iconColor, borderColor)
 	icon:SetVertexColor(iconColor:GetRGB())
@@ -122,6 +131,23 @@ local function Update()
 	lastReady = ready
 end
 
+-- Only while the cooldown helper is on. The duration object accepts secret
+-- values; without it, a secret cooldown isn't shown.
+local function UpdateCooldown()
+	if not (active and spell and FadeUI.GetDB().cooldownHelper) then
+		cooldown:Clear()
+	elseif C_Spell.GetSpellCooldownDuration and cooldown.SetCooldownFromDurationObject then
+		cooldown:SetCooldownFromDurationObject(C_Spell.GetSpellCooldownDuration(spell), true)
+	else
+		local info = C_Spell.GetSpellCooldown(spell)
+		if info and not (issecret(info.startTime) or issecret(info.duration)) then
+			cooldown:SetCooldown(info.startTime, info.duration, info.modRate)
+		else
+			cooldown:Clear()
+		end
+	end
+end
+
 -------------------------------------------------------------------------------
 -- Show and hide
 -------------------------------------------------------------------------------
@@ -143,6 +169,7 @@ local function Stop()
 		timer:Cancel()
 		timer = nil
 	end
+	cooldown:Clear()
 	Refresh()
 end
 
@@ -154,18 +181,21 @@ local function RestartTimer()
 	if timeout > 0 then timer = C_Timer.NewTimer(timeout, Stop) end
 end
 
--- `field` is the helper's setting: "rangeHelper" or "resourceHelper".
+-- `field` is the helper's setting: "rangeHelper", "resourceHelper" or "cooldownHelper".
 local function Start(id, field)
 	local db = FadeUI.GetDB()
 	if not (db and db[field] and id) then return end
 	spell = id
 	active = true
-	lastReady = false -- it just failed, so becoming ready flashes
+	-- It just failed, so becoming ready flashes. Not for a cooldown: the
+	-- cooldown's bling marks that, so it doesn't flash while still cooling down.
+	lastReady = field == "cooldownHelper"
 	sinceCheck = 0
 	timeout = (db[TIME_FIELD[field]] or 0) / 10
 	RestartTimer()
 	Refresh()
 	Update()
+	UpdateCooldown()
 end
 
 f:SetScript("OnUpdate", function(_, elapsed)
@@ -195,7 +225,7 @@ f:SetScript("OnDragStop", function(self)
 end)
 f:SetScript("OnEnter", function(self)
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	GameTooltip:SetText("FadeUI range / resource helper", 1, 1, 1)
+	GameTooltip:SetText("FadeUI range / resource / cooldown helper", 1, 1, 1)
 	GameTooltip:AddLine("Drag to move. Type /fui range, or click Lock in the options, when it's in place.", nil, nil, nil, true)
 	GameTooltip:Show()
 end)
@@ -214,7 +244,12 @@ function FadeUI.RefreshRangeHelper()
 	local db = FadeUI.GetDB()
 	if not db then return end
 	Place()
-	if active and not (db.rangeHelper or db.resourceHelper) then Stop() else Refresh() end
+	if active and not (db.rangeHelper or db.resourceHelper or db.cooldownHelper) then
+		Stop()
+	else
+		Refresh()
+		UpdateCooldown()
+	end
 end
 
 -------------------------------------------------------------------------------
@@ -225,10 +260,15 @@ local OUT_OF_RANGE = {}
 for _, s in pairs({ ERR_OUT_OF_RANGE, ERR_SPELL_OUT_OF_RANGE, SPELL_FAILED_OUT_OF_RANGE }) do -- pairs: skips any this client lacks
 	OUT_OF_RANGE[s] = true
 end
+local NOT_READY = {}
+for _, s in pairs({ ERR_SPELL_COOLDOWN, ERR_ABILITY_COOLDOWN, SPELL_FAILED_NOT_READY }) do
+	NOT_READY[s] = true
+end
 
 f:RegisterEvent("PLAYER_LOGIN")
 f:RegisterEvent("UI_ERROR_MESSAGE")
 f:RegisterEvent("PLAYER_TARGET_CHANGED")
+f:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 f:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "player")
 f:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 
@@ -241,11 +281,17 @@ f:SetScript("OnEvent", function(_, event, _, b, c)
 		-- Short on resource: the game says so directly, whichever resource it is.
 		if ShortOnResource(c) then Start(c, "resourceHelper") end
 	elseif event == "UI_ERROR_MESSAGE" then
-		if not issecret(b) and OUT_OF_RANGE[b] and failedAt and GetTime() - failedAt < 0.1 then
-			Start(failedSpell, "rangeHelper")
+		if not issecret(b) and failedAt and GetTime() - failedAt < 0.1 then
+			if OUT_OF_RANGE[b] then
+				Start(failedSpell, "rangeHelper")
+			elseif NOT_READY[b] then
+				Start(failedSpell, "cooldownHelper")
+			end
 		end
 	elseif event == "PLAYER_TARGET_CHANGED" then
 		if active then RestartTimer() end -- stay up while tabbing through targets
+	elseif event == "SPELL_UPDATE_COOLDOWN" then
+		if active then UpdateCooldown() end
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
 		-- A secret spell ID can't be compared, so any cast hides it then.
 		if active and (issecret(c) or c == spell) then Stop() end

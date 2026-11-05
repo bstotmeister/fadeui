@@ -36,6 +36,12 @@
         "UISpecialFrames",
         "ERR_OUT_OF_RANGE",
         "ERR_SPELL_OUT_OF_RANGE",
-        "SPELL_FAILED_OUT_OF_RANGE"
+        "SPELL_FAILED_OUT_OF_RANGE",
+        "NUM_CONTAINER_FRAMES",
+        "MinimapCluster",
+        "HybridMinimap",
+        "ERR_SPELL_COOLDOWN",
+        "ERR_ABILITY_COOLDOWN",
+        "SPELL_FAILED_NOT_READY"
     ]
 }
