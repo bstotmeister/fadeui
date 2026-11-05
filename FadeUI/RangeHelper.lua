@@ -12,7 +12,8 @@
 --   their bling when it ends. It hides when you cast that spell, or after the
 --   helper's time (rangeTime, resourceTime, cooldownTime) has passed since the
 --   last failure or target change (so you can tab through targets to find one in
---   range).
+--   range). A spell failing on cooldown just after you cast it (cooldownBuffer)
+--   doesn't show, so pressing it again straight away doesn't bring it up.
 --
 --   /fui range (or Move in the options) unlocks the icon to drag it into place.
 --
@@ -44,6 +45,7 @@ local issecret = issecretvalue or function() return false end
 
 local spell                  -- the spell shown: the last one that failed out of range, resource or cooldown
 local failedSpell, failedAt  -- the player's last failed cast; its error follows right after
+local castSpell, castAt      -- the player's last successful cast
 local unlocked = false
 local active = false         -- up after a failed cast
 local timeout = 0            -- seconds, from the helper that showed the icon
@@ -265,6 +267,13 @@ for _, s in pairs({ ERR_SPELL_COOLDOWN, ERR_ABILITY_COOLDOWN, SPELL_FAILED_NOT_R
 	NOT_READY[s] = true
 end
 
+-- Still pressing a spell you just cast: it failing on cooldown within the
+-- cooldown buffer (cooldownBuffer) is ignored.
+local function JustCast(id)
+	local db = FadeUI.GetDB()
+	return id == castSpell and GetTime() - castAt < (db and db.cooldownBuffer or 0) / 10
+end
+
 f:RegisterEvent("PLAYER_LOGIN")
 f:RegisterEvent("UI_ERROR_MESSAGE")
 f:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -284,7 +293,7 @@ f:SetScript("OnEvent", function(_, event, _, b, c)
 		if not issecret(b) and failedAt and GetTime() - failedAt < 0.1 then
 			if OUT_OF_RANGE[b] then
 				Start(failedSpell, "rangeHelper")
-			elseif NOT_READY[b] then
+			elseif NOT_READY[b] and not JustCast(failedSpell) then
 				Start(failedSpell, "cooldownHelper")
 			end
 		end
@@ -295,5 +304,6 @@ f:SetScript("OnEvent", function(_, event, _, b, c)
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
 		-- A secret spell ID can't be compared, so any cast hides it then.
 		if active and (issecret(c) or c == spell) then Stop() end
+		if not issecret(c) then castSpell, castAt = c, GetTime() end
 	end
 end)

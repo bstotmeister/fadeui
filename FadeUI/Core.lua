@@ -169,6 +169,7 @@ local function Defaults(target)
 	target.rangeTime = 80    -- the icon stays up this long after a range failure or target change, tenths of a second (0 = until cast)
 	target.resourceTime = 80 -- the same, after a resource failure
 	target.cooldownTime = 80 -- the same, after a cooldown failure
+	target.cooldownBuffer = 20 -- a spell failing on cooldown this soon after you cast it is ignored, tenths of a second (0 = off)
 	target.rangePoint, target.rangeRelPoint, target.rangeX, target.rangeY = "CENTER", "CENTER", 0, -120
 	target.minimapShown = "normal" -- minimap style while shown: "normal" or "map" (Minimap.lua)
 	target.minimapHidden = "nodes" -- ...and while hidden: "none", "nodes" or "map"
@@ -721,7 +722,7 @@ function FadeUI.SetBagsOpen(on)
 	FadeUI.Changed()
 end
 
--- `field` is "fadeIn", "fadeOut", "fadeDelay", "chatIdle", "rangeTime", "resourceTime" or "cooldownTime"; `seconds` may be fractional.
+-- `field` is "fadeIn", "fadeOut", "fadeDelay", "chatIdle", "rangeTime", "resourceTime", "cooldownTime" or "cooldownBuffer"; `seconds` may be fractional.
 function FadeUI.SetTime(field, seconds)
 	if not db or type(seconds) ~= "number" then return end
 	db[field] = math.min(FadeUI.MAX_TIME, math.max(0, math.floor(seconds * 10 + 0.5)))
