@@ -164,6 +164,8 @@ local function Defaults(target)
 	target.chatIdle = 100 -- "When active" chat hides after this long without activity, tenths of a second
 	target.rangeHelper = true    -- show a spell's icon after it fails out of range (RangeHelper.lua)
 	target.resourceHelper = true -- ...or short on mana/rage/energy
+	target.rangeTime = 80    -- the icon stays up this long after a range failure or target change, tenths of a second (0 = until cast)
+	target.resourceTime = 80 -- the same, after a resource failure
 	target.rangePoint, target.rangeRelPoint, target.rangeX, target.rangeY = "CENTER", "CENTER", 0, -120
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
@@ -668,7 +670,7 @@ function FadeUI.SetEnabled(on)
 	FadeUI.Changed()
 end
 
--- `field` is "fadeIn", "fadeOut", "fadeDelay" or "chatIdle"; `seconds` may be fractional.
+-- `field` is "fadeIn", "fadeOut", "fadeDelay", "chatIdle", "rangeTime" or "resourceTime"; `seconds` may be fractional.
 function FadeUI.SetTime(field, seconds)
 	if not db or type(seconds) ~= "number" then return end
 	db[field] = math.min(FadeUI.MAX_TIME, math.max(0, math.floor(seconds * 10 + 0.5)))

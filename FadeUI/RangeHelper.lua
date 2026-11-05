@@ -7,8 +7,9 @@
 --   dull (grayed and darker) while you're short on mana/rage/energy. Out of range
 --   with enough resource also tints the icon red; with both, the icon stays dull
 --   inside the red border, so both show. When it's ready it flashes and turns
---   normal. It hides when you cast that spell, or a few seconds after the last
---   failure or target change (so you can tab through targets to find one in range).
+--   normal. It hides when you cast that spell, or after the helper's time
+--   (rangeTime, resourceTime) has passed since the last failure or target change
+--   (so you can tab through targets to find one in range).
 --
 --   /fui range (or Move in the options) unlocks the icon to drag it into place.
 --
@@ -22,7 +23,9 @@ local FadeUI = ns.FadeUI
 
 local SIZE = 40
 local BORDER = 3       -- thick enough to read around a dull icon
-local TIMEOUT = 8      -- seconds the icon stays up after the last error or target change
+-- Each helper's setting for how long the icon stays up after the last failure
+-- or target change, in tenths of a second. 0 = until you cast the spell.
+local TIME_FIELD = { rangeHelper = "rangeTime", resourceHelper = "resourceTime" }
 local POLL = 0.1       -- seconds between range checks
 local PLACEHOLDER = "Interface\\Icons\\INV_Misc_QuestionMark"
 
@@ -40,6 +43,7 @@ local spell                  -- the spell shown: the last one that failed out of
 local failedSpell, failedAt  -- the player's last failed cast; its error follows right after
 local unlocked = false
 local active = false         -- up after a failed cast
+local timeout = 0            -- seconds, from the helper that showed the icon
 local lastReady, timer, sinceCheck
 
 -------------------------------------------------------------------------------
@@ -143,8 +147,11 @@ local function Stop()
 end
 
 local function RestartTimer()
-	if timer then timer:Cancel() end
-	timer = C_Timer.NewTimer(TIMEOUT, Stop)
+	if timer then
+		timer:Cancel()
+		timer = nil
+	end
+	if timeout > 0 then timer = C_Timer.NewTimer(timeout, Stop) end
 end
 
 -- `field` is the helper's setting: "rangeHelper" or "resourceHelper".
@@ -155,6 +162,7 @@ local function Start(id, field)
 	active = true
 	lastReady = false -- it just failed, so becoming ready flashes
 	sinceCheck = 0
+	timeout = (db[TIME_FIELD[field]] or 0) / 10
 	RestartTimer()
 	Refresh()
 	Update()
