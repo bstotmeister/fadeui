@@ -1,10 +1,11 @@
 # FadeUI
 
-Hide the UI like Alt-Z, one element at a time. Each Blizzard element (action bars,
-player frame, minimap, chat...) can be shown **Always**, **In combat**,
-**Combat/Target**, **Out of combat**, or **Never**. Visibility is driven by secure
-state drivers, so elements appear and disappear in combat without taint errors,
-and keybinds keep working on hidden bars.
+Auto hide the World of Warcraft UI out of combat for a clean, immersive screen. Each
+Blizzard element (action bars, player frame, minimap, chat...) can be shown **Always**,
+**In combat**, **Combat/Target**, **Out of combat**, or **Never**, like pressing Alt-Z
+but per element and automatic. Visibility is driven by secure state drivers, so
+elements appear and disappear in combat without taint errors, and keybinds keep
+working on hidden bars.
 
 ## Usage
 

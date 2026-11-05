@@ -1,8 +1,21 @@
-# FadeUI
+# FadeUI: Customizable Auto Hide UI, Element by Element
 
-Hide the UI like Alt-Z, one element at a time. Keep your screen clear while you're out questing or standing around, and have the parts you need fade in the moment combat starts or you pick a target.
+FadeUI lets you choose exactly when each part of your World of Warcraft UI is shown. Give every element its own rule: **Always**, **In combat**, **Combat/Target**, **Out of combat**, or **Never**. Hide your action bars until a fight starts, keep your unit frames up while you have a target, and trim the minimap down to just its nodes, like herbs and ore. You get a clean, immersive screen while you explore, and everything you rely on fades back in the moment you need it.
 
-## Modes
+Hiding your action bars? An optional, minimal spell icon pops up when a cast fails and shows you why: out of range, short on mana, rage or energy, or still on cooldown.
+
+Built for **WoW Forever**. It's like pressing Alt-Z, but automatic and element by element, and your UI comes back on its own when combat starts.
+
+## Why FadeUI
+
+- **Your rules, element by element:** over 30 Blizzard UI elements, each with its own visibility mode.
+- **Immersive by default:** a clean, minimal screen while you quest, gather or stand in town, with no clutter until it matters.
+- **Play with hidden action bars:** spell helpers show when a spell is out of range, on cooldown or short on mana, and keybinds keep working.
+- **A minimap that stays out of the way:** keep just the herb and ore nodes, or a borderless circular map.
+- **Safe in combat:** built on secure state drivers, so there are no taint errors and no blocked actions.
+- **Plays nice with Blizzard's UI:** Edit Mode, the Cooldown Manager and the Damage Meter all work, and one toggle puts everything back.
+
+## Show UI in combat, hide it out of combat
 
 Every element gets one of five modes:
 
@@ -14,7 +27,7 @@ Every element gets one of five modes:
 
 Chat has its own modes instead: **Always**, **When active** (hides after a set number of idle seconds and comes back with the next message), or **While typing**.
 
-## What it can hide
+## Hide action bars, unit frames, minimap, chat and more
 
 - **Action bars:** Action Bars 1–8, Stance/Form Bar, Pet Bar
 - **Unit frames:** Player, Pet, Target, Target of Target, Focus, Cast Bar, Swing Timers, Boss Frames
@@ -23,7 +36,7 @@ Chat has its own modes instead: **Always**, **When active** (hides after a set n
 
 Bag buttons can also show whenever your bags are open.
 
-## Minimap styles
+## Minimal minimap: just the nodes, or a clean circle
 
 Choose what the minimap looks like while it's shown, and what's left of it while it's hidden:
 
@@ -34,7 +47,7 @@ Choose what the minimap looks like while it's shown, and what's left of it while
 
 Hover a node or marker to see what it is. Clicking the map pings that spot, or turn that off so clicks go through to the world.
 
-## Spell helpers
+## Spell helpers for hidden action bars
 
 With your action bars hidden, you can't see why a spell didn't cast. When a spell fails, these show its icon until it's ready:
 
@@ -44,20 +57,19 @@ With your action bars hidden, you can't see why a spell didn't cast. When a spel
 
 The icon flashes when the spell is ready, and hides when you cast it or after a set time. Type `/fui range` to move it.
 
-## Features
+## More features
 
-- **No combat taint:** visibility runs on secure state drivers, so frames appear and disappear in combat without errors.
-- **Adjustable fading:** set the fade-in time, the fade-out time, and a delay before fading out (for example, right after combat ends). In combat, elements always hide instantly.
+- **Smooth fading:** set the fade-in time, the fade-out time, and a delay before fading out (for example, right after combat ends). In combat, elements always hide instantly.
 - **One-click setup:** click a column header in the options window to set every element to that mode.
 - **Search:** type in the options window to find an element quickly.
 - **Edit Mode friendly:** everything is shown while Edit Mode is open, so you can still move your frames.
 - **Instant off switch:** turning FadeUI off puts everything back exactly as Blizzard had it.
 - **Account-wide settings:** every character shares one setup, or tick a box to give a character its own.
 
-## Usage
+## Commands and keybinds
 
 - `/fadeui` or `/fui` opens the options window
-- `/fui toggle`, `/fui on` or `/fui off` switches FadeUI on and off (like Alt-Z)
+- `/fui toggle`, `/fui on` or `/fui off` switches FadeUI on and off
 - `/fui range` unlocks the spell helper icon so you can drag it into place (type it again to lock it)
 - `/fui reset` goes back to the default settings
 - **Key Bindings > AddOns > FadeUI** has binds for the on/off toggle and for opening the options window
