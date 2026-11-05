@@ -17,7 +17,7 @@ and keybinds keep working on hidden bars.
 Addon source lives in `FadeUI/`. Symlink it into your WoW client so changes load on `/reload`:
 
 ```sh
-scripts/link.sh                # _classic_beta_ (default)
+scripts/link.sh                # _forever_ (default)
 scripts/link.sh _retail_       # or any other flavor folder
 ```
 

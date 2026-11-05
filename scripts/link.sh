@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Symlink the addon folder (FadeUI/) into a WoW client's AddOns folder so edits show up after /reload.
-# Usage: scripts/link.sh [flavor]   (default: _classic_beta_; e.g. _retail_, _classic_era_)
+# Usage: scripts/link.sh [flavor]   (default: _forever_; e.g. _retail_, _classic_era_)
 set -euo pipefail
 
 WOW_DIR="${WOW_DIR:-/Applications/World of Warcraft}"
-FLAVOR="${1:-_classic_beta_}"
+FLAVOR="${1:-_forever_}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ADDONS="$WOW_DIR/$FLAVOR/Interface/AddOns"
 TARGET="$ADDONS/FadeUI"
