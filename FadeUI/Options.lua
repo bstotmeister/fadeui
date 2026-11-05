@@ -1,6 +1,6 @@
 -- FadeUI options window: one row per UI element, one button per mode.
 
-local ADDON, ns = ...
+local _, ns = ...
 local FadeUI = ns.FadeUI
 
 local BG      = { 0.055, 0.055, 0.065 }
