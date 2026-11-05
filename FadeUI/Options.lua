@@ -19,6 +19,7 @@ local ROW_H, GROUP_H = 26, 30
 
 local win
 local rows = {}
+local groups = {} -- { title, header, rows } per group, for the search filter
 local refs = {}
 
 -------------------------------------------------------------------------------
@@ -137,23 +138,52 @@ local function SecondsBox(parent, field)
 	return e
 end
 
+-- A text box with a grey hint while it's empty. `onChange` gets the text.
+local function SearchBox(parent, w, h, hint, onChange)
+	local e = CreateFrame("EditBox", nil, parent)
+	e:SetSize(w, h)
+	e:SetAutoFocus(false)
+	e:SetFontObject("GameFontHighlightSmall")
+	e:SetTextInsets(6, 6, 0, 0)
+	e:SetMaxLetters(40)
+	Fill(e, "BACKGROUND", BTN)
+	Outline(e, LINE)
+	local placeholder = Text(e, "GameFontDisableSmall", hint)
+	placeholder:SetPoint("LEFT", 6, 0)
+	e:SetScript("OnEnterPressed", e.ClearFocus)
+	e:SetScript("OnEscapePressed", function(self)
+		self:SetText("")
+		self:ClearFocus()
+	end)
+	e:SetScript("OnTextChanged", function(self)
+		local text = self:GetText()
+		placeholder:SetShown(text == "")
+		onChange(text)
+	end)
+	return e
+end
+
 -------------------------------------------------------------------------------
 -- Rows
 -------------------------------------------------------------------------------
 
-local function GroupHeader(parent, title, y)
-	local fs = Text(parent, "GameFontNormal", title, ACCENT)
-	fs:SetPoint("TOPLEFT", 4, y - 10)
-	local rule = parent:CreateTexture(nil, "ARTWORK")
+-- Headers and rows are placed by Layout(), so the search can hide and restack them.
+local function GroupHeader(parent, title)
+	local h = CreateFrame("Frame", nil, parent)
+	h:SetPoint("RIGHT")
+	h:SetHeight(GROUP_H)
+	local fs = Text(h, "GameFontNormal", title, ACCENT)
+	fs:SetPoint("TOPLEFT", 4, -10)
+	local rule = h:CreateTexture(nil, "ARTWORK")
 	rule:SetColorTexture(LINE[1], LINE[2], LINE[3], 1)
 	rule:SetHeight(1)
 	rule:SetPoint("LEFT", fs, "RIGHT", 10, 0)
-	rule:SetPoint("RIGHT", parent, "RIGHT", -4, 0)
+	rule:SetPoint("RIGHT", h, "RIGHT", -4, 0)
+	return h
 end
 
-local function ElementRow(parent, el, y)
+local function ElementRow(parent, el)
 	local row = CreateFrame("Frame", nil, parent)
-	row:SetPoint("TOPLEFT", 0, y)
 	row:SetPoint("RIGHT")
 	row:SetHeight(ROW_H)
 	row.el = el
@@ -204,9 +234,10 @@ local function ElementRow(parent, el, y)
 		refs.fade[#refs.fade + 1] = row.idle
 	end
 
-	-- Bag buttons' "while open" switch sits on a line of its own, below the row.
+	-- Bag buttons' "while open" switch sits on a line of its own, below the row
+	-- (Layout leaves room for it).
 	if el.key == "bags" then
-		row.bagsOpen = Checkbox(parent, "Also show while your bags are open", function(self)
+		row.bagsOpen = Checkbox(row, "Also show while your bags are open", function(self)
 			FadeUI.SetBagsOpen(self:GetChecked())
 		end)
 		row.bagsOpen:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 24, 0)
@@ -271,6 +302,41 @@ local function ScrollArea(parent)
 	end)
 	sf.UpdateThumb = update
 	return sf, content
+end
+
+-- Stacks the groups and rows that match `query` (case-insensitive, on the
+-- element or group name) and hides the rest. An empty query shows everything.
+local function Layout(query)
+	query = strtrim(query or ""):lower()
+	-- Keys of the matching elements, for "set all"; nil when not searching.
+	refs.matches = query ~= "" and {} or nil
+	local cy = 0
+	for _, g in ipairs(groups) do
+		local groupHit = query == "" or g.title:lower():find(query, 1, true)
+		local shown = {}
+		for _, row in ipairs(g.rows) do
+			local hit = groupHit or row.el.label:lower():find(query, 1, true)
+			row:SetShown(hit and true or false)
+			if hit then
+				shown[#shown + 1] = row
+				if refs.matches then refs.matches[row.el.key] = true end
+			end
+		end
+		g.header:SetShown(#shown > 0)
+		if #shown > 0 then
+			g.header:SetPoint("TOPLEFT", 0, cy)
+			cy = cy - GROUP_H
+			for _, row in ipairs(shown) do
+				row:SetPoint("TOPLEFT", 0, cy)
+				cy = cy - ROW_H - (row.extraH or 0)
+			end
+			cy = cy - 6
+		end
+	end
+	refs.noMatch:SetShown(cy == 0)
+	refs.content:SetHeight(math.max(GROUP_H, -cy))
+	refs.scroll:SetVerticalScroll(0)
+	refs.scroll.UpdateThumb()
 end
 
 -------------------------------------------------------------------------------
@@ -363,6 +429,39 @@ local function Build()
 	Tooltip(refs.perChar, "Settings for this character only",
 		"Off: this character uses your account-wide settings, shared with every character that has this off.\n\nOn: this character keeps its own settings, starting as a copy of the account-wide ones. Changes then only affect this character.")
 
+	-- Range and resource helpers: they share one icon, and each has its own time
+	y = y - 26
+	local SHARED = "\n\nIt stays up while you tab through targets, and hides when you cast the spell or after the seconds set next to this. With both helpers on and both problems at once: red border around a dull icon."
+	local function Helper(field, timeField, label, tip, timeTip, after)
+		local c = Checkbox(win, label, function(self) FadeUI.SetHelper(field, self:GetChecked()) end)
+		if after then
+			c:SetPoint("LEFT", after, "RIGHT", 24, 0)
+		else
+			c:SetPoint("TOPLEFT", PAD, y)
+		end
+		Tooltip(c, label, tip .. SHARED)
+		local e = SecondsBox(win, timeField)
+		e:SetPoint("LEFT", c.text, "RIGHT", 10, 0)
+		Tooltip(e, label .. " time", timeTip .. " 0 = until you cast the spell.")
+		refs.fade[#refs.fade + 1] = e
+		local unit = Text(win, "GameFontHighlightSmall", "s", MUTED)
+		unit:SetPoint("LEFT", e, "RIGHT", 3, 0)
+		return c, e, unit
+	end
+	local unit
+	refs.rangeHelper, refs.rangeTime, unit = Helper("rangeHelper", "rangeTime", "Range helper",
+		"When a spell fails because you're out of range, shows that spell's icon with a red border and red tint until you're close enough (green border), then it flashes.",
+		"Seconds the icon stays up after a spell fails out of range, or after you change target.")
+	refs.resourceHelper, refs.resourceTime, unit = Helper("resourceHelper", "resourceTime", "Resource helper",
+		"When a spell fails because you're short on mana, rage, energy or another resource, shows that spell's icon dulled until you have enough, then it flashes.",
+		"Seconds the icon stays up after a spell fails for lack of resource, or after you change target.", unit)
+	refs.rangeMove = Button(win, "Move", 56, SEG_H, function()
+		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
+	end)
+	refs.rangeMove:SetPoint("LEFT", unit, "RIGHT", 24, 0)
+	Tooltip(refs.rangeMove, "Move the helper icon",
+		"Shows the range/resource helper icon so you can drag it into place. Click Lock (or type /fui range) when you're done.")
+
 	-- Status line
 	y = y - 26
 	refs.status = Text(win, "GameFontHighlightSmall", "", MUTED)
@@ -376,8 +475,10 @@ local function Build()
 	cols:SetPoint("TOPLEFT", PAD, y)
 	cols:SetPoint("RIGHT", -PAD - 8, 0)
 	cols:SetHeight(18)
-	local colLabel = Text(cols, "GameFontDisableSmall", "Element")
-	colLabel:SetPoint("LEFT", 8, 0)
+	refs.search = SearchBox(cols, LABEL_W - 14, 18, "Search, e.g. map", Layout)
+	refs.search:SetPoint("LEFT", 2, 0)
+	Tooltip(refs.search, "Search",
+		"Type to filter the list by element or group name. Escape clears it.")
 	for i, mode in ipairs(FadeUI.MODES) do
 		local h = CreateFrame("Button", nil, cols)
 		h:SetSize(SEG_W, 18)
@@ -386,8 +487,9 @@ local function Build()
 		fs:SetPoint("CENTER")
 		h:SetScript("OnEnter", function() fs:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3]) end)
 		h:SetScript("OnLeave", function() fs:SetTextColor(0.5, 0.5, 0.5) end)
-		h:SetScript("OnClick", function() FadeUI.SetAll(mode.key) end)
-		Tooltip(h, "Set all: " .. mode.label, "Set every element in the list to \"" .. mode.label .. "\".")
+		h:SetScript("OnClick", function() FadeUI.SetAll(mode.key, refs.matches) end)
+		Tooltip(h, "Set all: " .. mode.label, "Set every element in the list to \"" .. mode.label
+			.. "\". While searching, only the elements that match.")
 	end
 	local colRule = cols:CreateTexture(nil, "ARTWORK")
 	colRule:SetColorTexture(LINE[1], LINE[2], LINE[3], 1)
@@ -401,18 +503,18 @@ local function Build()
 	sf:SetPoint("TOPLEFT", PAD, y)
 	sf:SetPoint("BOTTOMRIGHT", -PAD - 8, 48)
 	refs.scroll = sf
+	refs.content = content
 
-	local cy = 0
 	for _, group in ipairs(FadeUI.GROUPS) do
-		GroupHeader(content, group.title, cy)
-		cy = cy - GROUP_H
+		local g = { title = group.title, header = GroupHeader(content, group.title), rows = {} }
 		for _, el in ipairs(group.items) do
-			local row = ElementRow(content, el, cy)
-			cy = cy - ROW_H - (row.extraH or 0)
+			g.rows[#g.rows + 1] = ElementRow(content, el)
 		end
-		cy = cy - 6
+		groups[#groups + 1] = g
 	end
-	content:SetHeight(-cy)
+	refs.noMatch = Text(content, "GameFontDisable", "No matching elements.")
+	refs.noMatch:SetPoint("TOPLEFT", 8, -10)
+	Layout("")
 
 	-- Footer
 	local foot = CreateFrame("Frame", nil, win)
@@ -479,6 +581,14 @@ function FadeUI.RefreshOptions()
 	local key = GetBindingKey and GetBindingKey("FADEUI_TOGGLE")
 	refs.keyHint:SetText(key and ("Toggle key: |cffffffff" .. key .. "|r")
 		or "No toggle key yet: Key Bindings > AddOns > FadeUI")
+
+	refs.rangeHelper:SetChecked(db.rangeHelper)
+	refs.resourceHelper:SetChecked(db.resourceHelper)
+	refs.rangeTime:SetAlpha(db.rangeHelper and 1 or 0.45)
+	refs.resourceTime:SetAlpha(db.resourceHelper and 1 or 0.45)
+	local unlocked = FadeUI.IsRangeIconUnlocked()
+	refs.rangeMove.label:SetText(unlocked and "Lock" or "Move")
+	SetActive(refs.rangeMove, unlocked)
 
 	if refs.scroll.UpdateThumb then refs.scroll.UpdateThumb() end
 end

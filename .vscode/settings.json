@@ -33,6 +33,9 @@
         "ChatEdit_GetActiveWindow",
         "ChatEdit_ActivateChat",
         "ChatEdit_DeactivateChat",
-        "UISpecialFrames"
+        "UISpecialFrames",
+        "ERR_OUT_OF_RANGE",
+        "ERR_SPELL_OUT_OF_RANGE",
+        "SPELL_FAILED_OUT_OF_RANGE"
     ]
 }

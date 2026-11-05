@@ -21,10 +21,14 @@ globals = {
 
 -- WoW API it reads. Add new ones here as the addon starts using them.
 read_globals = {
+	"C_Spell",
 	"C_Timer",
+	"CreateColor",
 	"CreateFrame",
 	"DEFAULT_CHAT_FRAME",
 	"DeleteMacro",
+	"ERR_OUT_OF_RANGE",
+	"ERR_SPELL_OUT_OF_RANGE",
 	"EventRegistry",
 	"GameTooltip",
 	"GetBindingKey",
@@ -34,10 +38,12 @@ read_globals = {
 	"InCombatLockdown",
 	"NUM_CONTAINER_FRAMES",
 	"RegisterStateDriver",
+	"SPELL_FAILED_OUT_OF_RANGE",
 	"SecureCmdOptionParse",
 	"UIParent",
 	"UISpecialFrames",
 	"UnregisterStateDriver",
+	"issecretvalue",
 	"hooksecurefunc",
 	"strtrim",
 	"tinsert",
