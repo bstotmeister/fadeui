@@ -465,6 +465,17 @@ local function Build()
 	Tooltip(refs.rangeMove, "Move the helper icon",
 		"Shows the helper icon so you can drag it into place. Click Lock (or type /fui range) when you're done.")
 
+	-- Cooldown buffer: under the Cooldown helper's seconds
+	y = y - 26
+	refs.cooldownBuffer = SecondsBox(win, "cooldownBuffer")
+	refs.cooldownBuffer:SetPoint("TOPLEFT", refs.cooldownTime, "BOTTOMLEFT", 0, -6)
+	Tooltip(refs.cooldownBuffer, "Cooldown buffer",
+		"Seconds after you cast a spell that it failing on cooldown is ignored, so pressing it again straight after casting it doesn't bring up the icon. 0 = off.")
+	refs.fade[#refs.fade + 1] = refs.cooldownBuffer
+	local bufferLabel = Text(win, "GameFontHighlight", "Buffer:")
+	bufferLabel:SetPoint("RIGHT", refs.cooldownBuffer, "LEFT", -6, 0)
+	Text(win, "GameFontHighlightSmall", "s", MUTED):SetPoint("LEFT", refs.cooldownBuffer, "RIGHT", 3, 0)
+
 	-- Minimap styles: one row for while it's shown, one for while it's hidden,
 	-- each with its own map size. The buttons and sizes line up in columns.
 	local MAP_TIP = "Just the map, cropped to a circle around you at your usual zoom (Map size, on the right; 100% is the whole map). No border or buttons, and clicks go through."
@@ -633,6 +644,7 @@ function FadeUI.RefreshOptions()
 	refs.resourceTime:SetAlpha(db.resourceHelper and 1 or 0.45)
 	refs.cooldownHelper:SetChecked(db.cooldownHelper)
 	refs.cooldownTime:SetAlpha(db.cooldownHelper and 1 or 0.45)
+	refs.cooldownBuffer:SetAlpha(db.cooldownHelper and 1 or 0.45)
 	for _, row in ipairs(refs.minimapRows) do
 		for _, b in ipairs(row.buttons) do SetActive(b, db[row.field] == b.value) end
 		row.sizeText:SetText(FadeUI.GetMinimapSize(row.sizeField) .. "%")
