@@ -429,7 +429,7 @@ local function Build()
 	Tooltip(refs.perChar, "Settings for this character only",
 		"Off: this character uses your account-wide settings, shared with every character that has this off.\n\nOn: this character keeps its own settings, starting as a copy of the account-wide ones. Changes then only affect this character.")
 
-	-- Range and resource helpers: they share one icon, and each has its own time
+	-- Range, resource and cooldown helpers: they share one icon, and each has its own time
 	y = y - 26
 	local SHARED = "\n\nIt stays up while you tab through targets, and hides when you cast the spell or after the seconds set next to this. With both helpers on and both problems at once: red border around a dull icon."
 	local function Helper(field, timeField, label, tip, timeTip, after)
@@ -455,12 +455,15 @@ local function Build()
 	refs.resourceHelper, refs.resourceTime, unit = Helper("resourceHelper", "resourceTime", "Resource helper",
 		"When a spell fails because you're short on mana, rage, energy or another resource, shows that spell's icon dulled until you have enough, then it flashes.",
 		"Seconds the icon stays up after a spell fails for lack of resource, or after you change target.", unit)
+	refs.cooldownHelper, refs.cooldownTime, unit = Helper("cooldownHelper", "cooldownTime", "Cooldown helper",
+		"When a spell fails because it's on cooldown, shows that spell's icon with its cooldown, as on the action bars. While this is on, the icon also shows the cooldown for the other helpers.",
+		"Seconds the icon stays up after a spell fails on cooldown, or after you change target.", unit)
 	refs.rangeMove = Button(win, "Move", 56, SEG_H, function()
 		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
 	end)
 	refs.rangeMove:SetPoint("LEFT", unit, "RIGHT", 24, 0)
 	Tooltip(refs.rangeMove, "Move the helper icon",
-		"Shows the range/resource helper icon so you can drag it into place. Click Lock (or type /fui range) when you're done.")
+		"Shows the helper icon so you can drag it into place. Click Lock (or type /fui range) when you're done.")
 
 	-- Minimap styles: one row for while it's shown, one for while it's hidden,
 	-- each with its own map size. The buttons and sizes line up in columns.
@@ -628,6 +631,8 @@ function FadeUI.RefreshOptions()
 	refs.resourceHelper:SetChecked(db.resourceHelper)
 	refs.rangeTime:SetAlpha(db.rangeHelper and 1 or 0.45)
 	refs.resourceTime:SetAlpha(db.resourceHelper and 1 or 0.45)
+	refs.cooldownHelper:SetChecked(db.cooldownHelper)
+	refs.cooldownTime:SetAlpha(db.cooldownHelper and 1 or 0.45)
 	for _, row in ipairs(refs.minimapRows) do
 		for _, b in ipairs(row.buttons) do SetActive(b, db[row.field] == b.value) end
 		row.sizeText:SetText(FadeUI.GetMinimapSize(row.sizeField) .. "%")

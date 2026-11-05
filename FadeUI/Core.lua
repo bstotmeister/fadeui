@@ -165,8 +165,10 @@ local function Defaults(target)
 	target.bagsOpen = true -- bag buttons also show while your bags are open
 	target.rangeHelper = true    -- show a spell's icon after it fails out of range (RangeHelper.lua)
 	target.resourceHelper = true -- ...or short on mana/rage/energy
+	target.cooldownHelper = true -- ...or on cooldown (and shows the cooldown on the icon)
 	target.rangeTime = 80    -- the icon stays up this long after a range failure or target change, tenths of a second (0 = until cast)
 	target.resourceTime = 80 -- the same, after a resource failure
+	target.cooldownTime = 80 -- the same, after a cooldown failure
 	target.rangePoint, target.rangeRelPoint, target.rangeX, target.rangeY = "CENTER", "CENTER", 0, -120
 	target.minimapShown = "normal" -- minimap style while shown: "normal" or "map" (Minimap.lua)
 	target.minimapHidden = "nodes" -- ...and while hidden: "none", "nodes" or "map"
@@ -673,7 +675,7 @@ function FadeUI.Changed()
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 end
 
--- `field` is "rangeHelper" or "resourceHelper".
+-- `field` is "rangeHelper", "resourceHelper" or "cooldownHelper".
 function FadeUI.SetHelper(field, on)
 	if not db then return end
 	db[field] = on and true or false
@@ -719,7 +721,7 @@ function FadeUI.SetBagsOpen(on)
 	FadeUI.Changed()
 end
 
--- `field` is "fadeIn", "fadeOut", "fadeDelay", "chatIdle", "rangeTime" or "resourceTime"; `seconds` may be fractional.
+-- `field` is "fadeIn", "fadeOut", "fadeDelay", "chatIdle", "rangeTime", "resourceTime" or "cooldownTime"; `seconds` may be fractional.
 function FadeUI.SetTime(field, seconds)
 	if not db or type(seconds) ~= "number" then return end
 	db[field] = math.min(FadeUI.MAX_TIME, math.max(0, math.floor(seconds * 10 + 0.5)))
@@ -888,12 +890,12 @@ SlashCmdList.FADEUI = function(msg)
 		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
 		Print(FadeUI.IsRangeIconUnlocked()
 			and "helper icon unlocked: drag it into place. Type |cffffff00/fui range|r again to lock it."
-			or "helper icon locked. It appears when a spell fails out of range or short on resource.")
+			or "helper icon locked. It appears when a spell fails out of range, short on resource or on cooldown.")
 	else
 		Print("commands:")
 		Print("  /fui - open the options window")
 		Print("  /fui toggle | on | off - switch FadeUI (like Alt-Z)")
-		Print("  /fui range - unlock (to move) or lock the range/resource helper icon")
+		Print("  /fui range - unlock (to move) or lock the range/resource/cooldown helper icon")
 		Print("  /fui reset - back to default settings")
 	end
 end
