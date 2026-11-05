@@ -2,7 +2,7 @@
 ## Title: FadeUI
 ## Notes: Hide the UI like Alt-Z, element by element: always, in combat, combat or target, out of combat, or never.
 ## Author: Brad
-## Version: 1.1.0
+## Version: 1.2.0
 ## SavedVariables: FadeUIAccountDB
 ## SavedVariablesPerCharacter: FadeUIDB
 ## X-Curse-Project-ID: 1713253
