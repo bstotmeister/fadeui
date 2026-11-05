@@ -812,10 +812,16 @@ SlashCmdList.FADEUI = function(msg)
 	elseif cmd == "reset" then
 		FadeUI.ResetDefaults()
 		Print("settings reset to defaults.")
+	elseif cmd == "range" then
+		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
+		Print(FadeUI.IsRangeIconUnlocked()
+			and "range icon unlocked: drop a spell on it and drag it into place. Type |cffffff00/fui range|r again to lock it."
+			or "range icon locked. It appears when you get an \"Out of range\" error.")
 	else
 		Print("commands:")
 		Print("  /fui - open the options window")
 		Print("  /fui toggle | on | off - switch FadeUI (like Alt-Z)")
+		Print("  /fui range - unlock or lock the range icon")
 		Print("  /fui reset - back to default settings")
 	end
 end

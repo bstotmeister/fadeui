@@ -413,6 +413,12 @@ local function Build()
 		FadeUI.ResetDefaults()
 	end)
 	reset:SetPoint("LEFT", PAD - 1, 0)
+	refs.range = Button(foot, "Unlock range icon", 130, 22, function()
+		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
+	end)
+	refs.range:SetPoint("LEFT", reset, "RIGHT", 8, 0)
+	Tooltip(refs.range, "Range icon",
+		"Shows one spell after you get an \"Out of range\" error: red until you're close enough, then it flashes. The number is how many casts your power covers.\n\nUnlock it to drop a spell on it from your spellbook and drag it into place. Also: /fui range")
 	refs.keyHint = Text(foot, "GameFontHighlightSmall", "", MUTED)
 	refs.keyHint:SetPoint("RIGHT", -PAD, 0)
 end
@@ -464,6 +470,10 @@ function FadeUI.RefreshOptions()
 	local key = GetBindingKey and GetBindingKey("FADEUI_TOGGLE")
 	refs.keyHint:SetText(key and ("Toggle key: |cffffffff" .. key .. "|r")
 		or "No toggle key yet: Key Bindings > AddOns > FadeUI")
+
+	local unlocked = FadeUI.IsRangeIconUnlocked()
+	refs.range.label:SetText(unlocked and "Lock range icon" or "Unlock range icon")
+	SetActive(refs.range, unlocked)
 
 	if refs.scroll.UpdateThumb then refs.scroll.UpdateThumb() end
 end
