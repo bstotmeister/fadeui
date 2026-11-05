@@ -653,10 +653,12 @@ function FadeUI.SetMode(key, mode)
 	FadeUI.Changed()
 end
 
-function FadeUI.SetAll(mode)
+-- `only` (optional) is a set of element keys to limit it to, e.g. search matches.
+function FadeUI.SetAll(mode, only)
 	if not (db and MODE[mode]) then return end
 	for _, el in ipairs(ELEMENTS) do
-		if el.modes.byKey[mode] then db.modes[el.key] = mode end -- chat only takes the modes it has
+		-- chat only takes the modes it has
+		if el.modes.byKey[mode] and (not only or only[el.key]) then db.modes[el.key] = mode end
 	end
 	FadeUI.Changed()
 end
