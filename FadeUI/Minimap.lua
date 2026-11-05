@@ -11,7 +11,8 @@
 --   (border, zone text, buttons) while the cluster is hidden. Nodes makes it
 --   fully transparent: that hides the map, but the minimap still draws its
 --   blips. Map crops it with a smaller round mask (Media/MinimapMask*.tga).
---   Either way it doesn't take the mouse, so clicks go through to the world.
+--   Either way it takes mouse-over (for the blips' tooltips) but not clicks,
+--   so clicks go through to the world.
 --
 --   With Map chosen for shown, the cluster stays hidden (Core's Apply), and a
 --   state driver here follows the minimap's mode to switch between the shown
@@ -55,8 +56,10 @@ local function MoveOut()
 	saved = {
 		parent = parent,
 		alpha = Minimap:GetAlpha(),
-		mouse = Minimap:IsMouseEnabled(),
+		click = Minimap:IsMouseClickEnabled(),
+		motion = Minimap:IsMouseMotionEnabled(),
 		wheel = Minimap:IsMouseWheelEnabled(),
+		insets = { Minimap:GetHitRectInsets() },
 	}
 	-- Same effective scale as before, so it keeps its size (its anchors don't change).
 	overlay:SetScale(parent:GetEffectiveScale() / UIParent:GetEffectiveScale())
@@ -64,7 +67,9 @@ local function MoveOut()
 	Minimap:SetParent(overlay)
 	Minimap:SetFrameStrata(strata)
 	Minimap:SetFrameLevel(level)
-	Minimap:EnableMouse(false)
+	-- Mouse-over shows the blips' tooltips; clicks still go through to the world.
+	Minimap:SetMouseClickEnabled(false)
+	Minimap:SetMouseMotionEnabled(true)
 	Minimap:EnableMouseWheel(false)
 	-- Hide what's attached to the minimap (compass ring, zoom and addon buttons),
 	-- and keep it from catching the mouse. HybridMinimap is the map itself indoors.
@@ -89,8 +94,10 @@ local function MoveBack()
 	Minimap:SetFrameStrata(strata)
 	Minimap:SetFrameLevel(level)
 	Minimap:SetAlpha(saved.alpha)
-	Minimap:EnableMouse(saved.mouse)
+	Minimap:SetMouseClickEnabled(saved.click)
+	Minimap:SetMouseMotionEnabled(saved.motion)
 	Minimap:EnableMouseWheel(saved.wheel)
+	Minimap:SetHitRectInsets(unpack(saved.insets))
 	saved = nil
 end
 
@@ -112,8 +119,18 @@ local function Place(want, size)
 		MoveBack()
 	end
 	style = want
-	if want then Minimap:SetAlpha(want == "map" and 1 or 0) end
-	SetMask(want == "map" and size < 100 and size or nil)
+	local crop = want == "map" and size < 100 and size or nil
+	if want then
+		Minimap:SetAlpha(want == "map" and 1 or 0)
+		-- A cropped map only takes mouse-over within the square around its circle.
+		if crop then
+			local inset = Minimap:GetWidth() * (1 - crop / 100) / 2
+			Minimap:SetHitRectInsets(inset, inset, inset, inset)
+		else
+			Minimap:SetHitRectInsets(unpack(saved.insets))
+		end
+	end
+	SetMask(crop)
 end
 
 -------------------------------------------------------------------------------
