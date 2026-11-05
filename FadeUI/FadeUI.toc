@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: FadeUI
-## Notes: Hide the UI like Alt-Z, element by element: always, in combat, combat or target, out of combat, or never.
+## Notes: Auto hide the UI out of combat, element by element. Action bars, unit frames, minimap, chat and more fade in when you need them.
 ## Author: Brad
 ## Version: 1.2.0
 ## SavedVariables: FadeUIAccountDB
