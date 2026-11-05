@@ -168,6 +168,10 @@ local function Defaults(target)
 	target.rangeTime = 80    -- the icon stays up this long after a range failure or target change, tenths of a second (0 = until cast)
 	target.resourceTime = 80 -- the same, after a resource failure
 	target.rangePoint, target.rangeRelPoint, target.rangeX, target.rangeY = "CENTER", "CENTER", 0, -120
+	target.minimapShown = "normal" -- minimap style while shown: "normal" or "map" (Minimap.lua)
+	target.minimapHidden = "nodes" -- ...and while hidden: "none", "nodes" or "map"
+	target.minimapShownSize = 100  -- the map's size while shown, % of the minimap
+	target.minimapHiddenSize = 50  -- ...and while hidden
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
 end
@@ -219,6 +223,8 @@ local attached = {}  -- frame -> true while it lives inside its holder
 local guard = false  -- set while we call SetParent ourselves
 
 local fading = {}  -- holder -> alpha it is fading to (1 = in, 0 = out)
+
+function FadeUI.GetHolder(frame) return holders[frame] end
 
 local function FinishHide(h)
 	if InCombatLockdown() and h:IsProtected() then
@@ -346,6 +352,7 @@ local function SetFrameShown(frame, shown)
 end
 
 local function Holder_OnShow(self)
+	if FadeUI.RefreshMinimap then FadeUI.RefreshMinimap() end
 	if self.fadeuiDirect then
 		SetFrameShown(self.fadeuiFrame, true)
 		return
@@ -358,6 +365,7 @@ local function Holder_OnShow(self)
 end
 
 local function Holder_OnHide(self)
+	if FadeUI.RefreshMinimap then FadeUI.RefreshMinimap() end
 	CancelFadeOut(self)
 	fading[self] = nil
 	self:SetAlpha(1)
@@ -595,6 +603,9 @@ function FadeUI.Apply()
 	for _, el in ipairs(ELEMENTS) do
 		el.found = 0
 		local mode = el.modes.byKey[db.modes[el.key]] or el.modes.byKey.always
+		local driver = mode.driver
+		-- The map replaces the normal minimap while shown (Minimap.lua), so the cluster stays hidden.
+		if el.key == "minimap" and db.minimapShown == "map" then driver = "hide" end
 		for _, name in ipairs(el.frames) do
 			local f = GetFrame(name)
 			if f then
@@ -603,7 +614,7 @@ function FadeUI.Apply()
 					local h = (el.direct and AttachDirect or Attach)(f)
 					h.fadeuiChat = el.key == "chat"
 					h.fadeuiBags = el.key == "bags"
-					SetDriver(h, mode.driver)
+					SetDriver(h, driver)
 				else
 					Detach(f)
 				end
@@ -614,6 +625,7 @@ function FadeUI.Apply()
 	ChatIdleCheck()
 	FadeUI.UpdatePeek("chat")
 	FadeUI.UpdatePeek("bags")
+	if FadeUI.RefreshMinimap then FadeUI.RefreshMinimap() end
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 end
 

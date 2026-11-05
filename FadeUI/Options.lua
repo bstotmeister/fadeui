@@ -462,6 +462,48 @@ local function Build()
 	Tooltip(refs.rangeMove, "Move the helper icon",
 		"Shows the range/resource helper icon so you can drag it into place. Click Lock (or type /fui range) when you're done.")
 
+	-- Minimap styles: one row for while it's shown, one for while it's hidden,
+	-- each with its own map size. The buttons and sizes line up in columns.
+	local MAP_TIP = "Just the map, cropped to a circle around you at your usual zoom (Map size, on the right; 100% is the whole map). No border or buttons, and clicks go through."
+	refs.minimapRows = {}
+	local function MinimapRow(label, field, sizeField, when, options)
+		y = y - 26
+		local row = { field = field, sizeField = sizeField, buttons = {} }
+		local fs = Text(win, "GameFontHighlight", label)
+		fs:SetPoint("TOPLEFT", PAD, y - 3)
+		for i, o in ipairs(options) do
+			local b = Button(win, o[2], 52, SEG_H, function() FadeUI.SetMinimapStyle(field, o[1]) end)
+			b:SetPoint("LEFT", fs, "LEFT", 150 + (i - 1) * (52 + SEG_GAP), 0)
+			b.value = o[1]
+			Tooltip(b, label:gsub(":$", "") .. ": " .. o[2], o[3])
+			row.buttons[i] = b
+		end
+		local sizeLabel = Text(win, "GameFontHighlight", "Map size:")
+		sizeLabel:SetPoint("LEFT", fs, "LEFT", 150 + 3 * (52 + SEG_GAP) + 16, 0)
+		local smaller = Button(win, "-", 20, SEG_H, function() FadeUI.StepMinimapSize(sizeField, -1) end)
+		smaller:SetPoint("LEFT", sizeLabel, "RIGHT", 8, 0)
+		row.sizeText = Text(win, "GameFontHighlightSmall", "")
+		row.sizeText:SetWidth(36)
+		row.sizeText:SetPoint("LEFT", smaller, "RIGHT", 2, 0)
+		local bigger = Button(win, "+", 20, SEG_H, function() FadeUI.StepMinimapSize(sizeField, 1) end)
+		bigger:SetPoint("LEFT", row.sizeText, "RIGHT", 2, 0)
+		for _, b in ipairs({ smaller, bigger }) do
+			Tooltip(b, "Map size " .. when, "How much of the minimap the Map style keeps " .. when
+				.. ", as a share of its normal size. 100% is the whole map.")
+		end
+		row.size = { sizeLabel, smaller, row.sizeText, bigger }
+		refs.minimapRows[#refs.minimapRows + 1] = row
+	end
+	MinimapRow("Minimap when shown:", "minimapShown", "minimapShownSize", "while shown", {
+		{ "normal", "Normal", "Blizzard's minimap, with its border, buttons and zone text." },
+		{ "map", "Map", MAP_TIP },
+	})
+	MinimapRow("Minimap when hidden:", "minimapHidden", "minimapHiddenSize", "while hidden", {
+		{ "none", "None", "Nothing: the minimap is fully hidden." },
+		{ "nodes", "Nodes", "Only what the minimap marks: herb and ore nodes, quest areas, party members and your arrow. No map behind them, and clicks go through." },
+		{ "map", "Map", MAP_TIP },
+	})
+
 	-- Status line
 	y = y - 26
 	refs.status = Text(win, "GameFontHighlightSmall", "", MUTED)
@@ -586,6 +628,11 @@ function FadeUI.RefreshOptions()
 	refs.resourceHelper:SetChecked(db.resourceHelper)
 	refs.rangeTime:SetAlpha(db.rangeHelper and 1 or 0.45)
 	refs.resourceTime:SetAlpha(db.resourceHelper and 1 or 0.45)
+	for _, row in ipairs(refs.minimapRows) do
+		for _, b in ipairs(row.buttons) do SetActive(b, db[row.field] == b.value) end
+		row.sizeText:SetText(FadeUI.GetMinimapSize(row.sizeField) .. "%")
+		for _, f in ipairs(row.size) do f:SetAlpha(db[row.field] == "map" and 1 or 0.45) end
+	end
 	local unlocked = FadeUI.IsRangeIconUnlocked()
 	refs.rangeMove.label:SetText(unlocked and "Lock" or "Move")
 	SetActive(refs.rangeMove, unlocked)
