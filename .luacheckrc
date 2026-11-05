@@ -32,6 +32,7 @@ read_globals = {
 	"GetNumMacros",
 	"GetTime",
 	"InCombatLockdown",
+	"NUM_CONTAINER_FRAMES",
 	"RegisterStateDriver",
 	"SecureCmdOptionParse",
 	"UIParent",
