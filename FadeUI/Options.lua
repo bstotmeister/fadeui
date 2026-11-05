@@ -352,6 +352,20 @@ local function Build()
 	Tooltip(refs.perChar, "Settings for this character only",
 		"Off: this character uses your account-wide settings, shared with every character that has this off.\n\nOn: this character keeps its own settings, starting as a copy of the account-wide ones. Changes then only affect this character.")
 
+	-- Range helper, on the same line
+	refs.rangeHelper = Checkbox(win, "Range helper", function(self)
+		FadeUI.SetRangeHelper(self:GetChecked())
+	end)
+	refs.rangeHelper:SetPoint("TOPLEFT", PAD + 320, y)
+	Tooltip(refs.rangeHelper, "Range helper",
+		"When a spell fails with \"Out of range\", shows that spell's icon: red until you're close enough, then it flashes. The number is how many casts your power covers.\n\nIt stays up while you tab through targets, and hides when you cast the spell or a few seconds later.")
+	refs.rangeMove = Button(win, "Move", 56, SEG_H, function()
+		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
+	end)
+	refs.rangeMove:SetPoint("LEFT", refs.rangeHelper.text, "RIGHT", 10, 0)
+	Tooltip(refs.rangeMove, "Move the range helper",
+		"Shows the icon so you can drag it into place. Click Lock (or type /fui range) when you're done.")
+
 	-- Status line
 	y = y - 26
 	refs.status = Text(win, "GameFontHighlightSmall", "", MUTED)
@@ -413,12 +427,6 @@ local function Build()
 		FadeUI.ResetDefaults()
 	end)
 	reset:SetPoint("LEFT", PAD - 1, 0)
-	refs.range = Button(foot, "Unlock range icon", 130, 22, function()
-		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
-	end)
-	refs.range:SetPoint("LEFT", reset, "RIGHT", 8, 0)
-	Tooltip(refs.range, "Range icon",
-		"Shows one spell after you get an \"Out of range\" error: red until you're close enough, then it flashes. The number is how many casts your power covers.\n\nUnlock it to drop a spell on it from your spellbook and drag it into place. Also: /fui range")
 	refs.keyHint = Text(foot, "GameFontHighlightSmall", "", MUTED)
 	refs.keyHint:SetPoint("RIGHT", -PAD, 0)
 end
@@ -471,9 +479,10 @@ function FadeUI.RefreshOptions()
 	refs.keyHint:SetText(key and ("Toggle key: |cffffffff" .. key .. "|r")
 		or "No toggle key yet: Key Bindings > AddOns > FadeUI")
 
+	refs.rangeHelper:SetChecked(db.rangeHelper)
 	local unlocked = FadeUI.IsRangeIconUnlocked()
-	refs.range.label:SetText(unlocked and "Lock range icon" or "Unlock range icon")
-	SetActive(refs.range, unlocked)
+	refs.rangeMove.label:SetText(unlocked and "Lock" or "Move")
+	SetActive(refs.rangeMove, unlocked)
 
 	if refs.scroll.UpdateThumb then refs.scroll.UpdateThumb() end
 end

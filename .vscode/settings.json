@@ -36,6 +36,7 @@
         "UISpecialFrames",
         "ERR_OUT_OF_RANGE",
         "ERR_SPELL_OUT_OF_RANGE",
-        "SPELL_FAILED_OUT_OF_RANGE"
+        "SPELL_FAILED_OUT_OF_RANGE",
+        "ERR_BADATTACKPOS"
     ]
 }
