@@ -162,6 +162,11 @@ local function Defaults(target)
 	target.fadeOut = 5    -- fade-out time, tenths of a second (0 = instant)
 	target.fadeDelay = 50 -- wait before fading out, tenths of a second
 	target.chatIdle = 100 -- "When active" chat hides after this long without activity, tenths of a second
+	target.rangeHelper = true    -- show a spell's icon after it fails out of range (RangeHelper.lua)
+	target.resourceHelper = true -- ...or short on mana/rage/energy
+	target.rangeTime = 80    -- the icon stays up this long after a range failure or target change, tenths of a second (0 = until cast)
+	target.resourceTime = 80 -- the same, after a resource failure
+	target.rangePoint, target.rangeRelPoint, target.rangeX, target.rangeY = "CENTER", "CENTER", 0, -120
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
 end
@@ -623,7 +628,15 @@ end
 -- Call after changing any setting.
 function FadeUI.Changed()
 	FadeUI.Apply()
+	if FadeUI.RefreshRangeHelper then FadeUI.RefreshRangeHelper() end
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
+end
+
+-- `field` is "rangeHelper" or "resourceHelper".
+function FadeUI.SetHelper(field, on)
+	if not db then return end
+	db[field] = on and true or false
+	FadeUI.Changed()
 end
 
 -- Switches this character between the account-wide settings and its own.
@@ -657,7 +670,7 @@ function FadeUI.SetEnabled(on)
 	FadeUI.Changed()
 end
 
--- `field` is "fadeIn", "fadeOut", "fadeDelay" or "chatIdle"; `seconds` may be fractional.
+-- `field` is "fadeIn", "fadeOut", "fadeDelay", "chatIdle", "rangeTime" or "resourceTime"; `seconds` may be fractional.
 function FadeUI.SetTime(field, seconds)
 	if not db or type(seconds) ~= "number" then return end
 	db[field] = math.min(FadeUI.MAX_TIME, math.max(0, math.floor(seconds * 10 + 0.5)))
@@ -714,6 +727,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
 				end
 			end
 			FadeUIDB.macro, FadeUIAccountDB.macro = nil, nil -- the old settings-macro switch
+			FadeUIDB.watch = nil -- the range helper's old spell slot (never released)
 			UseSettings()
 		elseif loggedIn then
 			-- A Blizzard module loaded late may have created one of our frames.
@@ -812,10 +826,16 @@ SlashCmdList.FADEUI = function(msg)
 	elseif cmd == "reset" then
 		FadeUI.ResetDefaults()
 		Print("settings reset to defaults.")
+	elseif cmd == "range" then
+		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
+		Print(FadeUI.IsRangeIconUnlocked()
+			and "helper icon unlocked: drag it into place. Type |cffffff00/fui range|r again to lock it."
+			or "helper icon locked. It appears when a spell fails out of range or short on resource.")
 	else
 		Print("commands:")
 		Print("  /fui - open the options window")
 		Print("  /fui toggle | on | off - switch FadeUI (like Alt-Z)")
+		Print("  /fui range - unlock (to move) or lock the range/resource helper icon")
 		Print("  /fui reset - back to default settings")
 	end
 end
