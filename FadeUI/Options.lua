@@ -352,19 +352,26 @@ local function Build()
 	Tooltip(refs.perChar, "Settings for this character only",
 		"Off: this character uses your account-wide settings, shared with every character that has this off.\n\nOn: this character keeps its own settings, starting as a copy of the account-wide ones. Changes then only affect this character.")
 
-	-- Range helper, on the same line
+	-- Range and resource helpers, on the same line; they share one icon
+	local SHARED = "\n\nIt stays up while you tab through targets, and hides when you cast the spell or a few seconds later. With both helpers on and both problems at once: red border around a dull icon."
 	refs.rangeHelper = Checkbox(win, "Range helper", function(self)
-		FadeUI.SetRangeHelper(self:GetChecked())
+		FadeUI.SetHelper("rangeHelper", self:GetChecked())
 	end)
 	refs.rangeHelper:SetPoint("TOPLEFT", PAD + 320, y)
 	Tooltip(refs.rangeHelper, "Range helper",
-		"When a spell fails with \"Out of range\", shows that spell's icon: red until you're close enough, then it flashes. The number is how many casts your power covers.\n\nIt stays up while you tab through targets, and hides when you cast the spell or a few seconds later.")
+		"When a spell fails because you're out of range, shows that spell's icon with a red border and red tint until you're close enough (green border), then it flashes." .. SHARED)
+	refs.resourceHelper = Checkbox(win, "Resource helper", function(self)
+		FadeUI.SetHelper("resourceHelper", self:GetChecked())
+	end)
+	refs.resourceHelper:SetPoint("LEFT", refs.rangeHelper.text, "RIGHT", 16, 0)
+	Tooltip(refs.resourceHelper, "Resource helper",
+		"When a spell fails because you're short on mana, rage, energy or another resource, shows that spell's icon dulled until you have enough, then it flashes." .. SHARED)
 	refs.rangeMove = Button(win, "Move", 56, SEG_H, function()
 		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
 	end)
-	refs.rangeMove:SetPoint("LEFT", refs.rangeHelper.text, "RIGHT", 10, 0)
-	Tooltip(refs.rangeMove, "Move the range helper",
-		"Shows the icon so you can drag it into place. Click Lock (or type /fui range) when you're done.")
+	refs.rangeMove:SetPoint("LEFT", refs.resourceHelper.text, "RIGHT", 10, 0)
+	Tooltip(refs.rangeMove, "Move the helper icon",
+		"Shows the range/resource helper icon so you can drag it into place. Click Lock (or type /fui range) when you're done.")
 
 	-- Status line
 	y = y - 26
@@ -480,6 +487,7 @@ function FadeUI.RefreshOptions()
 		or "No toggle key yet: Key Bindings > AddOns > FadeUI")
 
 	refs.rangeHelper:SetChecked(db.rangeHelper)
+	refs.resourceHelper:SetChecked(db.resourceHelper)
 	local unlocked = FadeUI.IsRangeIconUnlocked()
 	refs.rangeMove.label:SetText(unlocked and "Lock" or "Move")
 	SetActive(refs.rangeMove, unlocked)
