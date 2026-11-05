@@ -5,7 +5,6 @@
 --   It's red until the spell is in range, then flashes and turns normal. It hides
 --   when you cast that spell, or a few seconds after the last out-of-range error
 --   or target change (so you can tab through targets to find one in range).
---   Auto attack's "You are too far away!" shows the Auto Attack icon.
 --
 --   The corner number is how many casts of the spell your power covers.
 --
@@ -21,7 +20,6 @@ local FadeUI = ns.FadeUI
 local SIZE = 40
 local TIMEOUT = 8      -- seconds the icon stays up after the last error or target change
 local POLL = 0.1       -- seconds between range checks
-local AUTO_ATTACK = 6603
 local PLACEHOLDER = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local WHITE = CreateColor(1, 1, 1)
@@ -234,10 +232,7 @@ f:SetScript("OnEvent", function(_, event, _, b, c)
 	elseif event == "UNIT_SPELLCAST_FAILED" then
 		if not issecret(c) then failedSpell, failedAt = c, GetTime() end
 	elseif event == "UI_ERROR_MESSAGE" then
-		if issecret(b) then return end
-		if b == ERR_BADATTACKPOS then
-			Start(AUTO_ATTACK)
-		elseif OUT_OF_RANGE[b] and failedAt and GetTime() - failedAt < 0.1 then
+		if not issecret(b) and OUT_OF_RANGE[b] and failedAt and GetTime() - failedAt < 0.1 then
 			Start(failedSpell)
 		end
 	elseif event == "PLAYER_TARGET_CHANGED" then

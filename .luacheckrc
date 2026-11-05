@@ -27,7 +27,6 @@ read_globals = {
 	"CreateFrame",
 	"DEFAULT_CHAT_FRAME",
 	"DeleteMacro",
-	"ERR_BADATTACKPOS",
 	"ERR_OUT_OF_RANGE",
 	"ERR_SPELL_OUT_OF_RANGE",
 	"EventRegistry",
