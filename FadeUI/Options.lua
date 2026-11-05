@@ -417,24 +417,36 @@ local function Build()
 	Tooltip(refs.perChar, "Settings for this character only",
 		"Off: this character uses your account-wide settings, shared with every character that has this off.\n\nOn: this character keeps its own settings, starting as a copy of the account-wide ones. Changes then only affect this character.")
 
-	-- Range and resource helpers, on the same line; they share one icon
-	local SHARED = "\n\nIt stays up while you tab through targets, and hides when you cast the spell or a few seconds later. With both helpers on and both problems at once: red border around a dull icon."
-	refs.rangeHelper = Checkbox(win, "Range helper", function(self)
-		FadeUI.SetHelper("rangeHelper", self:GetChecked())
-	end)
-	refs.rangeHelper:SetPoint("TOPLEFT", PAD + 320, y)
-	Tooltip(refs.rangeHelper, "Range helper",
-		"When a spell fails because you're out of range, shows that spell's icon with a red border and red tint until you're close enough (green border), then it flashes." .. SHARED)
-	refs.resourceHelper = Checkbox(win, "Resource helper", function(self)
-		FadeUI.SetHelper("resourceHelper", self:GetChecked())
-	end)
-	refs.resourceHelper:SetPoint("LEFT", refs.rangeHelper.text, "RIGHT", 16, 0)
-	Tooltip(refs.resourceHelper, "Resource helper",
-		"When a spell fails because you're short on mana, rage, energy or another resource, shows that spell's icon dulled until you have enough, then it flashes." .. SHARED)
+	-- Range and resource helpers: they share one icon, and each has its own time
+	y = y - 26
+	local SHARED = "\n\nIt stays up while you tab through targets, and hides when you cast the spell or after the seconds set next to this. With both helpers on and both problems at once: red border around a dull icon."
+	local function Helper(field, timeField, label, tip, timeTip, after)
+		local c = Checkbox(win, label, function(self) FadeUI.SetHelper(field, self:GetChecked()) end)
+		if after then
+			c:SetPoint("LEFT", after, "RIGHT", 24, 0)
+		else
+			c:SetPoint("TOPLEFT", PAD, y)
+		end
+		Tooltip(c, label, tip .. SHARED)
+		local e = SecondsBox(win, timeField)
+		e:SetPoint("LEFT", c.text, "RIGHT", 10, 0)
+		Tooltip(e, label .. " time", timeTip .. " 0 = until you cast the spell.")
+		refs.fade[#refs.fade + 1] = e
+		local unit = Text(win, "GameFontHighlightSmall", "s", MUTED)
+		unit:SetPoint("LEFT", e, "RIGHT", 3, 0)
+		return c, e, unit
+	end
+	local unit
+	refs.rangeHelper, refs.rangeTime, unit = Helper("rangeHelper", "rangeTime", "Range helper",
+		"When a spell fails because you're out of range, shows that spell's icon with a red border and red tint until you're close enough (green border), then it flashes.",
+		"Seconds the icon stays up after a spell fails out of range, or after you change target.")
+	refs.resourceHelper, refs.resourceTime, unit = Helper("resourceHelper", "resourceTime", "Resource helper",
+		"When a spell fails because you're short on mana, rage, energy or another resource, shows that spell's icon dulled until you have enough, then it flashes.",
+		"Seconds the icon stays up after a spell fails for lack of resource, or after you change target.", unit)
 	refs.rangeMove = Button(win, "Move", 56, SEG_H, function()
 		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
 	end)
-	refs.rangeMove:SetPoint("LEFT", refs.resourceHelper.text, "RIGHT", 10, 0)
+	refs.rangeMove:SetPoint("LEFT", unit, "RIGHT", 24, 0)
 	Tooltip(refs.rangeMove, "Move the helper icon",
 		"Shows the range/resource helper icon so you can drag it into place. Click Lock (or type /fui range) when you're done.")
 
@@ -556,6 +568,8 @@ function FadeUI.RefreshOptions()
 
 	refs.rangeHelper:SetChecked(db.rangeHelper)
 	refs.resourceHelper:SetChecked(db.resourceHelper)
+	refs.rangeTime:SetAlpha(db.rangeHelper and 1 or 0.45)
+	refs.resourceTime:SetAlpha(db.resourceHelper and 1 or 0.45)
 	local unlocked = FadeUI.IsRangeIconUnlocked()
 	refs.rangeMove.label:SetText(unlocked and "Lock" or "Move")
 	SetActive(refs.rangeMove, unlocked)
