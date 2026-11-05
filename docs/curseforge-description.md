@@ -28,6 +28,7 @@ Chat has its own modes instead: **Always**, **When active** (hides after a set n
 - **One-click setup:** click a column header in the options window to set every element to that mode.
 - **Edit Mode friendly:** everything is shown while Edit Mode is open, so you can still move your frames.
 - **Instant off switch:** turning FadeUI off puts everything back exactly as Blizzard had it.
+- **Account-wide settings:** every character shares one setup, or tick a box to give a character its own.
 
 ## Usage
 
@@ -36,10 +37,6 @@ Chat has its own modes instead: **Always**, **When active** (hides after a set n
 - `/fui reset` goes back to the default settings
 - **Key Bindings > AddOns > FadeUI** has binds for the on/off toggle and for opening the options window
 - **Addon compartment button (minimap):** left-click toggles FadeUI, right-click opens the options window
-
-## WoW Forever beta note
-
-The Forever beta client currently forgets addon settings when the game restarts. FadeUI can keep a backup of your settings in one general macro and load it back at login. You can turn this off in the options once Blizzard fixes saved settings.
 
 ## Source and bugs
 

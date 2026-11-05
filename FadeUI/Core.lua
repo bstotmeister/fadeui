@@ -34,42 +34,41 @@ local Print = FadeUI.Print
 -------------------------------------------------------------------------------
 
 FadeUI.MODES = {
-	{ key = "always", code = "A", label = "Always",
+	{ key = "always", label = "Always",
 	  tip = "Always shown, like the normal UI.",
 	  color = { 0.24, 0.55, 0.30 }, driver = "show" },
-	{ key = "combat", code = "C", label = "In combat",
+	{ key = "combat", label = "In combat",
 	  tip = "Shown only while you are in combat.",
 	  color = { 0.72, 0.24, 0.20 }, driver = "[combat] show; hide" },
-	{ key = "target", code = "T", label = "Combat/Target",
+	{ key = "target", label = "Combat/Target",
 	  tip = "Shown in combat, and whenever you have something targeted.",
 	  color = { 0.80, 0.48, 0.14 }, driver = "[combat] show; [@target,exists] show; hide" },
-	{ key = "ooc", code = "O", label = "Out of combat",
+	{ key = "ooc", label = "Out of combat",
 	  tip = "Shown only while you are NOT in combat.",
 	  color = { 0.22, 0.44, 0.75 }, driver = "[combat] hide; show" },
-	{ key = "never", code = "N", label = "Never",
+	{ key = "never", label = "Never",
 	  tip = "Always hidden while FadeUI is on. Keybinds still work.",
 	  color = { 0.36, 0.36, 0.40 }, driver = "hide" },
 }
 -- Chat has its own modes: it hides when idle rather than by combat state.
 FadeUI.CHAT_MODES = {
-	{ key = "always", code = "A", label = "Always",
+	{ key = "always", label = "Always",
 	  tip = "Always shown, like the normal UI.",
 	  color = { 0.24, 0.55, 0.30 }, driver = "show" },
-	{ key = "active", code = "W", label = "When active",
+	{ key = "active", label = "When active",
 	  tip = "Hides once the chat window you're looking at has had no new message, and you haven't typed, for the idle time. The next message brings it back.",
 	  color = { 0.22, 0.44, 0.75 }, driver = "show" },
-	{ key = "typing", code = "Y", label = "While typing",
+	{ key = "typing", label = "While typing",
 	  tip = "Hidden except while you type a message.",
 	  color = { 0.36, 0.36, 0.40 }, driver = "hide" },
 }
 
--- Each list gets lookups by key and by settings-macro code.
+-- Each list gets a lookup by key.
 for _, list in ipairs({ FadeUI.MODES, FadeUI.CHAT_MODES }) do
-	list.byKey, list.byCode = {}, {}
+	list.byKey = {}
 	for i, m in ipairs(list) do
 		m.index = i
 		list.byKey[m.key] = m
-		list.byCode[m.code] = m
 	end
 end
 local MODE = FadeUI.MODES.byKey
@@ -77,9 +76,6 @@ FadeUI.MODE = MODE
 
 -------------------------------------------------------------------------------
 -- Elements
---
--- `id` is the element's slot in the settings macro. Never reuse or renumber an
--- id; give a new element the next free number (display order doesn't matter).
 -------------------------------------------------------------------------------
 
 local CHAT_FRAMES = {
@@ -95,66 +91,67 @@ end
 
 FadeUI.GROUPS = {
 	{ title = "Action bars", items = {
-		{ id = 1,  key = "bar1",   label = "Action Bar 1",       frames = { "MainActionBar", "MainMenuBar" }, default = "never" },
-		{ id = 2,  key = "bar2",   label = "Action Bar 2",       frames = { "MultiBarBottomLeft" },  default = "never" },
-		{ id = 3,  key = "bar3",   label = "Action Bar 3",       frames = { "MultiBarBottomRight" }, default = "never" },
-		{ id = 4,  key = "bar4",   label = "Action Bar 4",       frames = { "MultiBarRight" },       default = "never" },
-		{ id = 5,  key = "bar5",   label = "Action Bar 5",       frames = { "MultiBarLeft" },        default = "never" },
-		{ id = 6,  key = "bar6",   label = "Action Bar 6",       frames = { "MultiBar5" },           default = "never" },
-		{ id = 7,  key = "bar7",   label = "Action Bar 7",       frames = { "MultiBar6" },           default = "never" },
-		{ id = 8,  key = "bar8",   label = "Action Bar 8",       frames = { "MultiBar7" },           default = "never" },
-		{ id = 9,  key = "stance", label = "Stance / Form Bar",  frames = { "StanceBar" },           default = "never" },
-		{ id = 10, key = "petbar", label = "Pet Bar",            frames = { "PetActionBar" },        default = "never" },
+		{ key = "bar1",   label = "Action Bar 1",       frames = { "MainActionBar", "MainMenuBar" }, default = "never" },
+		{ key = "bar2",   label = "Action Bar 2",       frames = { "MultiBarBottomLeft" },  default = "never" },
+		{ key = "bar3",   label = "Action Bar 3",       frames = { "MultiBarBottomRight" }, default = "never" },
+		{ key = "bar4",   label = "Action Bar 4",       frames = { "MultiBarRight" },       default = "never" },
+		{ key = "bar5",   label = "Action Bar 5",       frames = { "MultiBarLeft" },        default = "never" },
+		{ key = "bar6",   label = "Action Bar 6",       frames = { "MultiBar5" },           default = "never" },
+		{ key = "bar7",   label = "Action Bar 7",       frames = { "MultiBar6" },           default = "never" },
+		{ key = "bar8",   label = "Action Bar 8",       frames = { "MultiBar7" },           default = "never" },
+		{ key = "stance", label = "Stance / Form Bar",  frames = { "StanceBar" },           default = "never" },
+		{ key = "petbar", label = "Pet Bar",            frames = { "PetActionBar" },        default = "never" },
 	}},
 	{ title = "Unit frames", items = {
-		{ id = 11, key = "player",  label = "Player Frame",      frames = { "PlayerFrame" },         default = "target" },
-		{ id = 12, key = "pet",     label = "Pet Frame",         frames = { "PetFrame" },            default = "target" },
-		{ id = 13, key = "target",  label = "Target Frame",      frames = { "TargetFrame" },         default = "target" },
-		{ id = 14, key = "tot",     label = "Target of Target",  frames = { "TargetFrameToT" },      default = "target",
+		{ key = "player",  label = "Player Frame",      frames = { "PlayerFrame" },         default = "target" },
+		{ key = "pet",     label = "Pet Frame",         frames = { "PetFrame" },            default = "target" },
+		{ key = "target",  label = "Target Frame",      frames = { "TargetFrame" },         default = "target" },
+		{ key = "tot",     label = "Target of Target",  frames = { "TargetFrameToT" },      default = "target",
 		  note = "Sits inside the Target Frame, so it is also hidden whenever that is." },
-		{ id = 15, key = "focus",   label = "Focus Frame",       frames = { "FocusFrame" },          default = "target" },
-		{ id = 16, key = "castbar", label = "Cast Bar",          frames = { "PlayerCastingBarFrame" }, default = "always", direct = true,
+		{ key = "focus",   label = "Focus Frame",       frames = { "FocusFrame" },          default = "target" },
+		{ key = "castbar", label = "Cast Bar",          frames = { "PlayerCastingBarFrame" }, default = "always", direct = true,
 		  note = "Only appears while you cast anyway. If it is locked to the Player Frame in Edit Mode, it hides with that frame too." },
-		{ id = 31, key = "swing",   label = "Swing Timers",      frames = { "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" }, default = "combat" },
-		{ id = 17, key = "boss",    label = "Boss Frames",       frames = { "BossTargetFrameContainer" }, default = "target" },
+		{ key = "swing",   label = "Swing Timers",      frames = { "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" }, default = "combat" },
+		{ key = "boss",    label = "Boss Frames",       frames = { "BossTargetFrameContainer" }, default = "target" },
 	}},
 	{ title = "Group frames", items = {
-		{ id = 18, key = "party",   label = "Party Frames",      frames = { "PartyFrame", "CompactPartyFrame" }, default = "combat" },
-		{ id = 19, key = "raid",    label = "Raid Frames",       frames = { "CompactRaidFrameContainer" }, default = "combat" },
-		{ id = 20, key = "raidmgr", label = "Raid Manager Tab",  frames = { "CompactRaidFrameManager" },   default = "never" },
+		{ key = "party",   label = "Party Frames",      frames = { "PartyFrame", "CompactPartyFrame" }, default = "combat" },
+		{ key = "raid",    label = "Raid Frames",       frames = { "CompactRaidFrameContainer" }, default = "combat" },
+		{ key = "raidmgr", label = "Raid Manager Tab",  frames = { "CompactRaidFrameManager" },   default = "never" },
 	}},
 	{ title = "Everything else", items = {
-		{ id = 21, key = "minimap", label = "Minimap",           frames = { "MinimapCluster" },      default = "target" },
-		{ id = 22, key = "buffs",   label = "Buffs",             frames = { "BuffFrame" },           default = "target" },
-		{ id = 23, key = "debuffs", label = "Debuffs",           frames = { "DebuffFrame" },         default = "combat" },
-		{ id = 24, key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "target", direct = true },
-		{ id = 25, key = "chat",    label = "Chat",              frames = CHAT_FRAMES,               default = "active", modes = FadeUI.CHAT_MODES,
+		{ key = "minimap", label = "Minimap",           frames = { "MinimapCluster" },      default = "target" },
+		{ key = "buffs",   label = "Buffs",             frames = { "BuffFrame" },           default = "target" },
+		{ key = "debuffs", label = "Debuffs",           frames = { "DebuffFrame" },         default = "combat" },
+		{ key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "target", direct = true },
+		{ key = "chat",    label = "Chat",              frames = CHAT_FRAMES,               default = "active", modes = FadeUI.CHAT_MODES,
 		  note = "Chat always comes back while you are typing a message." },
-		{ id = 26, key = "micro",   label = "Menu Buttons",      frames = { "MicroMenuContainer" },  default = "never" },
-		{ id = 27, key = "bags",    label = "Bag Buttons",       frames = { "BagsBar" },             default = "never" },
-		{ id = 28, key = "xp",      label = "XP / Rep Bars",     frames = { "MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer" }, default = "never" },
-		{ id = 29, key = "cdm",     label = "Cooldown Manager",  frames = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }, default = "never", direct = true },
-		{ id = 30, key = "meter",   label = "Damage Meter",      frames = { "DamageMeter" },         default = "never" },
+		{ key = "micro",   label = "Menu Buttons",      frames = { "MicroMenuContainer" },  default = "never" },
+		{ key = "bags",    label = "Bag Buttons",       frames = { "BagsBar" },             default = "never" },
+		{ key = "xp",      label = "XP / Rep Bars",     frames = { "MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer" }, default = "never" },
+		{ key = "cdm",     label = "Cooldown Manager",  frames = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }, default = "never", direct = true },
+		{ key = "meter",   label = "Damage Meter",      frames = { "DamageMeter" },         default = "never" },
 	}},
 }
 
-local ELEMENTS, BY_KEY, BY_ID, MAX_ID = {}, {}, {}, 0
+local ELEMENTS, BY_KEY = {}, {}
 for _, group in ipairs(FadeUI.GROUPS) do
 	for _, el in ipairs(group.items) do
 		el.modes = el.modes or FadeUI.MODES
 		ELEMENTS[#ELEMENTS + 1] = el
 		BY_KEY[el.key] = el
-		BY_ID[el.id] = el
-		if el.id > MAX_ID then MAX_ID = el.id end
 	end
 end
 FadeUI.ELEMENTS, FadeUI.BY_KEY = ELEMENTS, BY_KEY
 
 -------------------------------------------------------------------------------
 -- Settings
+--
+-- Settings are account-wide (FadeUIAccountDB). A character can switch to its
+-- own instead, kept in its per-character FadeUIDB with perCharacter = true.
 -------------------------------------------------------------------------------
 
-local db
+local db -- the settings in use: FadeUIAccountDB, or this character's FadeUIDB
 FadeUI.editMode = false
 FadeUI.pendingApply = false
 local loggedIn = false
@@ -165,7 +162,6 @@ local function Defaults(target)
 	target.fadeOut = 5    -- fade-out time, tenths of a second (0 = instant)
 	target.fadeDelay = 50 -- wait before fading out, tenths of a second
 	target.chatIdle = 100 -- "When active" chat hides after this long without activity, tenths of a second
-	target.macro = true   -- keep a copy of the settings in a macro (beta workaround)
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
 end
@@ -181,51 +177,32 @@ local function FillMissing(t)
 	end
 end
 
+-- Copies the settings (not the perCharacter switch) from one table to another.
+local function CopySettings(from, to)
+	local d = {}
+	Defaults(d)
+	for k in pairs(d) do to[k] = from[k] end
+	to.modes = {}
+	for key, mode in pairs(from.modes or {}) do to.modes[key] = mode end
+end
+
+-- Picks the account-wide or this character's settings. A character's own
+-- settings start as a copy of the account-wide ones.
+local function UseSettings()
+	if FadeUIDB.perCharacter and type(FadeUIDB.modes) ~= "table" then
+		CopySettings(FadeUIAccountDB, FadeUIDB)
+	end
+	db = FadeUIDB.perCharacter and FadeUIDB or FadeUIAccountDB
+	FillMissing(db)
+end
+
 function FadeUI.GetDB() return db end
 
-FadeUI.MAX_TIME = 999 -- tenths of a second; three digits in the settings macro
-
--- Compact form used by the settings macro: version, on/off, fade-in, fade-out,
--- fade-out delay, chat idle (three digits each), then one mode letter per
--- element id ("_" = unknown).
-function FadeUI.Encode()
-	local codes = {}
-	for id = 1, MAX_ID do
-		local el = BY_ID[id]
-		local m = el and el.modes.byKey[db.modes[el.key]]
-		codes[id] = m and m.code or "_"
-	end
-	local function t(v) return math.min(FadeUI.MAX_TIME, math.max(0, v or 0)) end
-	return ("4%d%03d%03d%03d%03d%s"):format(db.enabled and 1 or 0,
-		t(db.fadeIn), t(db.fadeOut), t(db.fadeDelay), t(db.chatIdle), table.concat(codes))
+function FadeUI.IsPerCharacter()
+	return type(FadeUIDB) == "table" and FadeUIDB.perCharacter or false
 end
 
-function FadeUI.Decode(s)
-	if type(s) ~= "string" or not db then return false end
-	local enabled, fadeIn, fadeOut, delay, chatIdle, codes = s:match("^4([01])(%d%d%d)(%d%d%d)(%d%d%d)(%d%d%d)([%u_]*)")
-	if not enabled then
-		-- version 3: no chat idle
-		enabled, fadeIn, fadeOut, delay, codes = s:match("^3([01])(%d%d%d)(%d%d%d)(%d%d%d)([ACTON_]*)")
-	end
-	if not enabled then
-		-- version 2: single-digit fade-in, no fade-out
-		enabled, fadeIn, codes = s:match("^2([01])(%d)([ACTON_]*)")
-	end
-	if not enabled then return false end
-	db.enabled = enabled == "1"
-	db.fadeIn = tonumber(fadeIn)
-	if fadeOut then
-		db.fadeOut = tonumber(fadeOut)
-		db.fadeDelay = tonumber(delay)
-	end
-	if chatIdle then db.chatIdle = tonumber(chatIdle) end
-	for id = 1, #codes do
-		local el = BY_ID[id]
-		local m = el and el.modes.byCode[codes:sub(id, id)]
-		if el and m then db.modes[el.key] = m.key end
-	end
-	return true
-end
+FadeUI.MAX_TIME = 999 -- tenths of a second
 
 -------------------------------------------------------------------------------
 -- Holders
@@ -607,106 +584,36 @@ function FadeUI.Apply()
 end
 
 -------------------------------------------------------------------------------
--- Settings macro
+-- Old settings macros
 --
--- The Forever beta client currently writes SavedVariables but never reads them
--- back, so every addon starts from defaults after a restart. Macros made with
--- CreateMacro do survive, so a copy of the settings is kept in one general macro
--- per character: "/fui load <data>". Clicking it just re-applies the settings.
+-- Version 1.0.0 kept a copy of its settings in a general macro per character
+-- (named FadeUI + 8 hex digits, body "/fui load ..."), because the Forever beta
+-- didn't load SavedVariables. The live game does, so those macros are removed.
 -------------------------------------------------------------------------------
 
-local mirror = { svLoaded = false, ready = false, restored = false, pendingWrite = false, token = 0 }
+local pendingMacroCleanup = false
+local cleaningMacros = false -- DeleteMacro can fire UPDATE_MACROS mid-loop
 
-local function MacroName()
-	local who = tostring(UnitName("player") or "") .. "-" .. tostring(GetRealmName and GetRealmName() or "")
-	local h = 5381
-	for i = 1, #who do h = (h * 33 + who:byte(i)) % 2147483647 end
-	return ("FadeUI%08x"):format(h) -- 14 characters, under the 16 limit
-end
-
-local function MacroAPI()
-	return CreateMacro and EditMacro and DeleteMacro and GetMacroBody and GetMacroIndexByName and true or false
-end
-
-local function MacroIndex()
-	local ok, index = pcall(GetMacroIndexByName, MacroName())
-	if ok and index and index > 0 then return index end
-end
-
-local function ReadMacro()
-	if not MacroAPI() then return end
-	local index = MacroIndex()
-	if not index then return end
-	local ok, body = pcall(GetMacroBody, index)
-	if ok and type(body) == "string" then
-		return body:match("/fui load ([%w_]+)") -- not anchored: bodies can come back with trailing spaces
+local function RemoveOldMacros()
+	if cleaningMacros then return end
+	if InCombatLockdown() then
+		pendingMacroCleanup = true
+		return
 	end
-end
-
-local function WriteMacro()
-	if not (db and db.macro and mirror.ready and MacroAPI()) then return end
-	if InCombatLockdown() then mirror.pendingWrite = true return end
-	mirror.pendingWrite = false
-
-	local data = FadeUI.Encode()
-	if ReadMacro() == data then return end
-	local body = "/fui load " .. data
-	local index = MacroIndex()
-	if index then
-		pcall(EditMacro, index, nil, nil, body)
-	else
-		local ok, made = pcall(CreateMacro, MacroName(), "INV_Misc_Eye_01", body, nil)
-		if ok and made and made ~= 0 then
-			Print("saved your settings in a general macro named %s, because the Forever beta forgets addon settings on restart. Leave it alone; you can turn this off in /fui.", MacroName())
-		elseif not mirror.warned then
-			mirror.warned = true
-			Print("couldn't create the settings macro (are your general macro slots full?). Settings will reset when the game restarts.")
+	pendingMacroCleanup = false
+	cleaningMacros = true
+	local removed = false
+	for i = GetNumMacros(), 1, -1 do -- general (account-wide) macros only
+		local name, _, body = GetMacroInfo(i)
+		if name and name:match("^FadeUI%x%x%x%x%x%x%x%x$") and body and body:find("/fui load", 1, true) then
+			DeleteMacro(i)
+			removed = true
 		end
 	end
-end
-
-local function DeleteSettingsMacro()
-	if not MacroAPI() then return end
-	if InCombatLockdown() then mirror.pendingDelete = true return end
-	mirror.pendingDelete = false
-	local index = MacroIndex()
-	if index then pcall(DeleteMacro, index) end
-end
-
--- Save soon, but not on every click.
-local function ScheduleWrite()
-	mirror.token = mirror.token + 1
-	local token = mirror.token
-	C_Timer.After(1, function()
-		if token == mirror.token then WriteMacro() end
-	end)
-end
-
-local function TryRestore()
-	if mirror.svLoaded or mirror.restored or not db then return end
-	local data = ReadMacro()
-	if data and FadeUI.Decode(data) then
-		mirror.restored = true
-		db.macro = true
-		Print("restored your settings from the settings macro.")
-		FadeUI.Apply()
+	cleaningMacros = false
+	if removed then
+		Print("removed its old settings macro. The game saves addon settings properly now, so it isn't needed.")
 	end
-end
-
-local function MirrorReady()
-	if mirror.ready then return end
-	TryRestore()
-	mirror.ready = true
-	if not mirror.svLoaded and not mirror.restored then
-		Print("is %s. Type |cffffff00/fui|r to choose what shows and when. Bind a toggle key under Key Bindings > AddOns.",
-			db.enabled and "ON" or "off")
-	end
-	WriteMacro()
-end
-
-function FadeUI.SetMacroMirror(on)
-	db.macro = on and true or false
-	if db.macro then WriteMacro() else DeleteSettingsMacro() end
 end
 
 -------------------------------------------------------------------------------
@@ -716,8 +623,15 @@ end
 -- Call after changing any setting.
 function FadeUI.Changed()
 	FadeUI.Apply()
-	ScheduleWrite()
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
+end
+
+-- Switches this character between the account-wide settings and its own.
+function FadeUI.SetPerCharacter(on)
+	if not db then return end
+	FadeUIDB.perCharacter = on and true or false
+	UseSettings()
+	FadeUI.Changed()
 end
 
 function FadeUI.SetMode(key, mode)
@@ -751,9 +665,7 @@ function FadeUI.SetTime(field, seconds)
 end
 
 function FadeUI.ResetDefaults()
-	local keepMacro = db.macro
 	Defaults(db)
-	db.macro = keepMacro
 	FadeUI.Changed()
 end
 
@@ -785,16 +697,24 @@ events:RegisterEvent("PLAYER_REGEN_DISABLED")
 events:RegisterEvent("PLAYER_REGEN_ENABLED")
 events:RegisterEvent("UPDATE_MACROS")
 
+local firstRun = false
+
 events:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
 		if arg1 == ADDON then
-			mirror.svLoaded = type(FadeUIDB) == "table" and type(FadeUIDB.modes) == "table"
-			if not mirror.svLoaded then
-				FadeUIDB = {}
-				Defaults(FadeUIDB)
+			if type(FadeUIDB) ~= "table" then FadeUIDB = {} end
+			if type(FadeUIAccountDB) ~= "table" then
+				-- First load with account-wide settings: start them from this
+				-- character's settings (from when they were per character), if any.
+				FadeUIAccountDB = {}
+				if type(FadeUIDB.modes) == "table" then
+					CopySettings(FadeUIDB, FadeUIAccountDB)
+				else
+					firstRun = true
+				end
 			end
-			db = FadeUIDB
-			FillMissing(db)
+			FadeUIDB.macro, FadeUIAccountDB.macro = nil, nil -- the old settings-macro switch
+			UseSettings()
 		elseif loggedIn then
 			-- A Blizzard module loaded late may have created one of our frames.
 			FadeUI.Apply()
@@ -803,8 +723,11 @@ events:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "PLAYER_LOGIN" then
 		loggedIn = true
 		chatLastActive = GetTime()
-		if mirror.macrosSeen then MirrorReady() else TryRestore() end
 		FadeUI.Apply()
+		if firstRun then
+			Print("is %s. Type |cffffff00/fui|r to choose what shows and when. Bind a toggle key under Key Bindings > AddOns.",
+				db.enabled and "ON" or "off")
+		end
 
 		-- Typing: a chat edit box asked to take focus (Enter, /, reply...) brings
 		-- chat back. It may have been hidden with chat, so it's focused again once shown.
@@ -852,22 +775,18 @@ events:SetScript("OnEvent", function(_, event, arg1)
 
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		FadeUI.Apply()
-		if not mirror.ready then
-			-- Normally UPDATE_MACROS says the macro list is in; don't wait forever.
-			C_Timer.After(10, MirrorReady)
-		end
+		RemoveOldMacros()
 
 	elseif event == "UPDATE_MACROS" then
-		mirror.macrosSeen = true
-		if loggedIn then MirrorReady() end
+		-- The macro list may only arrive after login.
+		if loggedIn then RemoveOldMacros() end
 
 	elseif event == "PLAYER_REGEN_DISABLED" then
 		if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if FadeUI.pendingApply then FadeUI.Apply() end
-		if mirror.pendingWrite then WriteMacro() end
-		if mirror.pendingDelete then DeleteSettingsMacro() end
+		if pendingMacroCleanup then RemoveOldMacros() end
 		if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 	end
 end)
@@ -880,8 +799,7 @@ SLASH_FADEUI1 = "/fadeui"
 SLASH_FADEUI2 = "/fui"
 SlashCmdList.FADEUI = function(msg)
 	msg = strtrim(msg or "")
-	local cmd, rest = msg:match("^(%S*)%s*(.-)$")
-	cmd = (cmd or ""):lower()
+	local cmd = (msg:match("^(%S*)") or ""):lower()
 
 	if cmd == "" or cmd == "options" or cmd == "config" then
 		FadeUI_OpenOptions()
@@ -891,12 +809,6 @@ SlashCmdList.FADEUI = function(msg)
 	elseif cmd == "on" or cmd == "off" then
 		FadeUI.SetEnabled(cmd == "on")
 		Print(cmd == "on" and "on." or "off. Your normal UI is back.")
-	elseif cmd == "load" then
-		if FadeUI.Decode(rest) then
-			FadeUI.Changed()
-		else
-			Print("that isn't a FadeUI settings string.")
-		end
 	elseif cmd == "reset" then
 		FadeUI.ResetDefaults()
 		Print("settings reset to defaults.")

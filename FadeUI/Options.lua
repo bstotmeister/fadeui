@@ -343,14 +343,14 @@ local function Build()
 		anchor = label
 	end
 
-	-- Settings macro
+	-- Account-wide or per-character settings
 	y = y - 26
-	refs.macro = Checkbox(win, "Keep settings in a macro", function(self)
-		FadeUI.SetMacroMirror(self:GetChecked())
+	refs.perChar = Checkbox(win, "Use settings for this character only", function(self)
+		FadeUI.SetPerCharacter(self:GetChecked())
 	end)
-	refs.macro:SetPoint("TOPLEFT", PAD, y)
-	Tooltip(refs.macro, "Keep settings in a macro",
-		"The Forever beta client currently forgets addon settings when the game restarts. This keeps a copy in one general macro (named FadeUI...) and reads it back at login. You can turn it off once Blizzard fixes saved settings.")
+	refs.perChar:SetPoint("TOPLEFT", PAD, y)
+	Tooltip(refs.perChar, "Settings for this character only",
+		"Off: this character uses your account-wide settings, shared with every character that has this off.\n\nOn: this character keeps its own settings, starting as a copy of the account-wide ones. Changes then only affect this character.")
 
 	-- Status line
 	y = y - 26
@@ -427,7 +427,7 @@ function FadeUI.RefreshOptions()
 	if not db then return end
 
 	refs.master:SetChecked(db.enabled)
-	refs.macro:SetChecked(db.macro)
+	refs.perChar:SetChecked(FadeUI.IsPerCharacter())
 	for _, e in ipairs(refs.fade) do
 		if not e:HasFocus() then e:SetText(("%g"):format((db[e.field] or 0) / 10)) end
 	end
