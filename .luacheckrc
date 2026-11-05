@@ -41,8 +41,6 @@ read_globals = {
 	"SecureCmdOptionParse",
 	"UIParent",
 	"UISpecialFrames",
-	"UnitExists",
-	"UnitPower",
 	"UnregisterStateDriver",
 	"issecretvalue",
 	"hooksecurefunc",

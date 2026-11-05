@@ -162,7 +162,8 @@ local function Defaults(target)
 	target.fadeOut = 5    -- fade-out time, tenths of a second (0 = instant)
 	target.fadeDelay = 50 -- wait before fading out, tenths of a second
 	target.chatIdle = 100 -- "When active" chat hides after this long without activity, tenths of a second
-	target.rangeHelper = true -- show a spell's icon after it fails out of range (RangeHelper.lua)
+	target.rangeHelper = true    -- show a spell's icon after it fails out of range (RangeHelper.lua)
+	target.resourceHelper = true -- ...or short on mana/rage/energy
 	target.rangePoint, target.rangeRelPoint, target.rangeX, target.rangeY = "CENTER", "CENTER", 0, -120
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
@@ -629,9 +630,10 @@ function FadeUI.Changed()
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 end
 
-function FadeUI.SetRangeHelper(on)
+-- `field` is "rangeHelper" or "resourceHelper".
+function FadeUI.SetHelper(field, on)
 	if not db then return end
-	db.rangeHelper = on and true or false
+	db[field] = on and true or false
 	FadeUI.Changed()
 end
 
@@ -827,13 +829,13 @@ SlashCmdList.FADEUI = function(msg)
 	elseif cmd == "range" then
 		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
 		Print(FadeUI.IsRangeIconUnlocked()
-			and "range helper unlocked: drag it into place. Type |cffffff00/fui range|r again to lock it."
-			or "range helper locked. It appears when a spell fails with \"Out of range\".")
+			and "helper icon unlocked: drag it into place. Type |cffffff00/fui range|r again to lock it."
+			or "helper icon locked. It appears when a spell fails out of range or short on resource.")
 	else
 		Print("commands:")
 		Print("  /fui - open the options window")
 		Print("  /fui toggle | on | off - switch FadeUI (like Alt-Z)")
-		Print("  /fui range - unlock (to move) or lock the range helper")
+		Print("  /fui range - unlock (to move) or lock the range/resource helper icon")
 		Print("  /fui reset - back to default settings")
 	end
 end
