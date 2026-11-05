@@ -19,6 +19,7 @@ local ROW_H, GROUP_H = 26, 30
 
 local win
 local rows = {}
+local groups = {} -- { title, header, rows } per group, for the search filter
 local refs = {}
 
 -------------------------------------------------------------------------------
@@ -137,23 +138,52 @@ local function SecondsBox(parent, field)
 	return e
 end
 
+-- A text box with a grey hint while it's empty. `onChange` gets the text.
+local function SearchBox(parent, w, h, hint, onChange)
+	local e = CreateFrame("EditBox", nil, parent)
+	e:SetSize(w, h)
+	e:SetAutoFocus(false)
+	e:SetFontObject("GameFontHighlightSmall")
+	e:SetTextInsets(6, 6, 0, 0)
+	e:SetMaxLetters(40)
+	Fill(e, "BACKGROUND", BTN)
+	Outline(e, LINE)
+	local placeholder = Text(e, "GameFontDisableSmall", hint)
+	placeholder:SetPoint("LEFT", 6, 0)
+	e:SetScript("OnEnterPressed", e.ClearFocus)
+	e:SetScript("OnEscapePressed", function(self)
+		self:SetText("")
+		self:ClearFocus()
+	end)
+	e:SetScript("OnTextChanged", function(self)
+		local text = self:GetText()
+		placeholder:SetShown(text == "")
+		onChange(text)
+	end)
+	return e
+end
+
 -------------------------------------------------------------------------------
 -- Rows
 -------------------------------------------------------------------------------
 
-local function GroupHeader(parent, title, y)
-	local fs = Text(parent, "GameFontNormal", title, ACCENT)
-	fs:SetPoint("TOPLEFT", 4, y - 10)
-	local rule = parent:CreateTexture(nil, "ARTWORK")
+-- Headers and rows are placed by Layout(), so the search can hide and restack them.
+local function GroupHeader(parent, title)
+	local h = CreateFrame("Frame", nil, parent)
+	h:SetPoint("RIGHT")
+	h:SetHeight(GROUP_H)
+	local fs = Text(h, "GameFontNormal", title, ACCENT)
+	fs:SetPoint("TOPLEFT", 4, -10)
+	local rule = h:CreateTexture(nil, "ARTWORK")
 	rule:SetColorTexture(LINE[1], LINE[2], LINE[3], 1)
 	rule:SetHeight(1)
 	rule:SetPoint("LEFT", fs, "RIGHT", 10, 0)
-	rule:SetPoint("RIGHT", parent, "RIGHT", -4, 0)
+	rule:SetPoint("RIGHT", h, "RIGHT", -4, 0)
+	return h
 end
 
-local function ElementRow(parent, el, y)
+local function ElementRow(parent, el)
 	local row = CreateFrame("Frame", nil, parent)
-	row:SetPoint("TOPLEFT", 0, y)
 	row:SetPoint("RIGHT")
 	row:SetHeight(ROW_H)
 	row.el = el
@@ -260,6 +290,41 @@ local function ScrollArea(parent)
 	end)
 	sf.UpdateThumb = update
 	return sf, content
+end
+
+-- Stacks the groups and rows that match `query` (case-insensitive, on the
+-- element or group name) and hides the rest. An empty query shows everything.
+local function Layout(query)
+	query = strtrim(query or ""):lower()
+	-- Keys of the matching elements, for "set all"; nil when not searching.
+	refs.matches = query ~= "" and {} or nil
+	local cy = 0
+	for _, g in ipairs(groups) do
+		local groupHit = query == "" or g.title:lower():find(query, 1, true)
+		local shown = {}
+		for _, row in ipairs(g.rows) do
+			local hit = groupHit or row.el.label:lower():find(query, 1, true)
+			row:SetShown(hit and true or false)
+			if hit then
+				shown[#shown + 1] = row
+				if refs.matches then refs.matches[row.el.key] = true end
+			end
+		end
+		g.header:SetShown(#shown > 0)
+		if #shown > 0 then
+			g.header:SetPoint("TOPLEFT", 0, cy)
+			cy = cy - GROUP_H
+			for _, row in ipairs(shown) do
+				row:SetPoint("TOPLEFT", 0, cy)
+				cy = cy - ROW_H
+			end
+			cy = cy - 6
+		end
+	end
+	refs.noMatch:SetShown(cy == 0)
+	refs.content:SetHeight(math.max(GROUP_H, -cy))
+	refs.scroll:SetVerticalScroll(0)
+	refs.scroll.UpdateThumb()
 end
 
 -------------------------------------------------------------------------------
@@ -379,8 +444,10 @@ local function Build()
 	cols:SetPoint("TOPLEFT", PAD, y)
 	cols:SetPoint("RIGHT", -PAD - 8, 0)
 	cols:SetHeight(18)
-	local colLabel = Text(cols, "GameFontDisableSmall", "Element")
-	colLabel:SetPoint("LEFT", 8, 0)
+	refs.search = SearchBox(cols, LABEL_W - 14, 18, "Search, e.g. map", Layout)
+	refs.search:SetPoint("LEFT", 2, 0)
+	Tooltip(refs.search, "Search",
+		"Type to filter the list by element or group name. Escape clears it.")
 	for i, mode in ipairs(FadeUI.MODES) do
 		local h = CreateFrame("Button", nil, cols)
 		h:SetSize(SEG_W, 18)
@@ -389,8 +456,9 @@ local function Build()
 		fs:SetPoint("CENTER")
 		h:SetScript("OnEnter", function() fs:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3]) end)
 		h:SetScript("OnLeave", function() fs:SetTextColor(0.5, 0.5, 0.5) end)
-		h:SetScript("OnClick", function() FadeUI.SetAll(mode.key) end)
-		Tooltip(h, "Set all: " .. mode.label, "Set every element in the list to \"" .. mode.label .. "\".")
+		h:SetScript("OnClick", function() FadeUI.SetAll(mode.key, refs.matches) end)
+		Tooltip(h, "Set all: " .. mode.label, "Set every element in the list to \"" .. mode.label
+			.. "\". While searching, only the elements that match.")
 	end
 	local colRule = cols:CreateTexture(nil, "ARTWORK")
 	colRule:SetColorTexture(LINE[1], LINE[2], LINE[3], 1)
@@ -404,18 +472,18 @@ local function Build()
 	sf:SetPoint("TOPLEFT", PAD, y)
 	sf:SetPoint("BOTTOMRIGHT", -PAD - 8, 48)
 	refs.scroll = sf
+	refs.content = content
 
-	local cy = 0
 	for _, group in ipairs(FadeUI.GROUPS) do
-		GroupHeader(content, group.title, cy)
-		cy = cy - GROUP_H
+		local g = { title = group.title, header = GroupHeader(content, group.title), rows = {} }
 		for _, el in ipairs(group.items) do
-			ElementRow(content, el, cy)
-			cy = cy - ROW_H
+			g.rows[#g.rows + 1] = ElementRow(content, el)
 		end
-		cy = cy - 6
+		groups[#groups + 1] = g
 	end
-	content:SetHeight(-cy)
+	refs.noMatch = Text(content, "GameFontDisable", "No matching elements.")
+	refs.noMatch:SetPoint("TOPLEFT", 8, -10)
+	Layout("")
 
 	-- Footer
 	local foot = CreateFrame("Frame", nil, win)
