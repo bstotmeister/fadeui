@@ -11,7 +11,8 @@
 --   (border, zone text, buttons) while the cluster is hidden. Nodes makes it
 --   fully transparent: that hides the map, but the minimap still draws its
 --   blips. Map crops it with a smaller round mask (Media/MinimapMask*.tga).
---   Either way it doesn't take the mouse, so clicks go through to the world.
+--   Either way it takes mouse-over (for the blips' tooltips), and clicks only
+--   with Ping on (minimapPing): off, clicks go through to the world.
 --
 --   With Map chosen for shown, the cluster stays hidden (Core's Apply), and a
 --   state driver here follows the minimap's mode to switch between the shown
@@ -55,8 +56,10 @@ local function MoveOut()
 	saved = {
 		parent = parent,
 		alpha = Minimap:GetAlpha(),
-		mouse = Minimap:IsMouseEnabled(),
+		click = Minimap:IsMouseClickEnabled(),
+		motion = Minimap:IsMouseMotionEnabled(),
 		wheel = Minimap:IsMouseWheelEnabled(),
+		insets = { Minimap:GetHitRectInsets() },
 	}
 	-- Same effective scale as before, so it keeps its size (its anchors don't change).
 	overlay:SetScale(parent:GetEffectiveScale() / UIParent:GetEffectiveScale())
@@ -64,7 +67,8 @@ local function MoveOut()
 	Minimap:SetParent(overlay)
 	Minimap:SetFrameStrata(strata)
 	Minimap:SetFrameLevel(level)
-	Minimap:EnableMouse(false)
+	-- Mouse-over shows the blips' tooltips; clicks are set in Place.
+	Minimap:SetMouseMotionEnabled(true)
 	Minimap:EnableMouseWheel(false)
 	-- Hide what's attached to the minimap (compass ring, zoom and addon buttons),
 	-- and keep it from catching the mouse. HybridMinimap is the map itself indoors.
@@ -89,8 +93,10 @@ local function MoveBack()
 	Minimap:SetFrameStrata(strata)
 	Minimap:SetFrameLevel(level)
 	Minimap:SetAlpha(saved.alpha)
-	Minimap:EnableMouse(saved.mouse)
+	Minimap:SetMouseClickEnabled(saved.click)
+	Minimap:SetMouseMotionEnabled(saved.motion)
 	Minimap:EnableMouseWheel(saved.wheel)
+	Minimap:SetHitRectInsets(unpack(saved.insets))
 	saved = nil
 end
 
@@ -104,16 +110,28 @@ local function SetMask(size)
 	end
 end
 
--- `want` is nil (normal), "nodes" or "map"; `size` is the map's size.
-local function Place(want, size)
+-- `want` is nil (normal), "nodes" or "map"; `size` is the map's size; `ping`
+-- lets clicks ping (otherwise they go through to the world).
+local function Place(want, size, ping)
 	if want and not style then
 		MoveOut()
 	elseif not want and style then
 		MoveBack()
 	end
 	style = want
-	if want then Minimap:SetAlpha(want == "map" and 1 or 0) end
-	SetMask(want == "map" and size < 100 and size or nil)
+	local crop = want == "map" and size < 100 and size or nil
+	if want then
+		Minimap:SetAlpha(want == "map" and 1 or 0)
+		Minimap:SetMouseClickEnabled(ping)
+		-- A cropped map only takes the mouse within the square around its circle.
+		if crop then
+			local inset = Minimap:GetWidth() * (1 - crop / 100) / 2
+			Minimap:SetHitRectInsets(inset, inset, inset, inset)
+		else
+			Minimap:SetHitRectInsets(unpack(saved.insets))
+		end
+	end
+	SetMask(crop)
 end
 
 -------------------------------------------------------------------------------
@@ -188,10 +206,11 @@ function FadeUI.RefreshMinimap()
 			want, size = db.minimapHidden, Size(db, "minimapHiddenSize")
 		end
 	end
-	Place(want, size)
+	Place(want, size, db.minimapPing and true or false)
 end
 
--- `field` is "minimapShown" ("normal", "map") or "minimapHidden" ("none", "nodes", "map").
+-- `field` is "minimapShown" ("normal", "map"), "minimapHidden" ("none", "nodes", "map")
+-- or "minimapPing" (true, false).
 function FadeUI.SetMinimapStyle(field, value)
 	local db = FadeUI.GetDB()
 	if not db then return end

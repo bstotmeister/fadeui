@@ -175,6 +175,7 @@ local function Defaults(target)
 	target.minimapHidden = "nodes" -- ...and while hidden: "none", "nodes" or "map"
 	target.minimapShownSize = 100  -- the map's size while shown, % of the minimap
 	target.minimapHiddenSize = 50  -- ...and while hidden
+	target.minimapPing = true      -- clicking Nodes or Map pings, like the normal minimap (off: clicks go through)
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
 end

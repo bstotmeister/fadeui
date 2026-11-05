@@ -478,7 +478,7 @@ local function Build()
 
 	-- Minimap styles: one row for while it's shown, one for while it's hidden,
 	-- each with its own map size. The buttons and sizes line up in columns.
-	local MAP_TIP = "Just the map, cropped to a circle around you at your usual zoom (Map size, on the right; 100% is the whole map). No border or buttons, and clicks go through."
+	local MAP_TIP = "Just the map, cropped to a circle around you at your usual zoom (Map size, on the right; 100% is the whole map). No border or buttons."
 	refs.minimapRows = {}
 	local function MinimapRow(label, field, sizeField, when, options)
 		y = y - 26
@@ -506,6 +506,7 @@ local function Build()
 				.. ", as a share of its normal size. 100% is the whole map.")
 		end
 		row.size = { sizeLabel, smaller, row.sizeText, bigger }
+		row.bigger = bigger
 		refs.minimapRows[#refs.minimapRows + 1] = row
 	end
 	MinimapRow("Minimap when shown:", "minimapShown", "minimapShownSize", "while shown", {
@@ -514,9 +515,15 @@ local function Build()
 	})
 	MinimapRow("Minimap when hidden:", "minimapHidden", "minimapHiddenSize", "while hidden", {
 		{ "none", "None", "Nothing: the minimap is fully hidden." },
-		{ "nodes", "Nodes", "Only what the minimap marks: herb and ore nodes, quest areas, party members and your arrow. No map behind them, and clicks go through." },
+		{ "nodes", "Nodes", "Only what the minimap marks: herb and ore nodes, quest areas, party members and your arrow. No map behind them." },
 		{ "map", "Map", MAP_TIP },
 	})
+	refs.minimapPing = Checkbox(win, "Click the map to ping", function(self)
+		FadeUI.SetMinimapStyle("minimapPing", self:GetChecked())
+	end)
+	refs.minimapPing:SetPoint("LEFT", refs.minimapRows[1].bigger, "RIGHT", 24, 0)
+	Tooltip(refs.minimapPing, "Click the map to ping",
+		"On: clicking the minimap in the Map or Nodes style pings that spot for your group, like the normal minimap.\n\nOff: clicks go through to the world instead.\n\nEither way, hovering a node or marker shows what it is.")
 
 	-- Status line
 	y = y - 26
@@ -650,6 +657,9 @@ function FadeUI.RefreshOptions()
 		row.sizeText:SetText(FadeUI.GetMinimapSize(row.sizeField) .. "%")
 		for _, f in ipairs(row.size) do f:SetAlpha(db[row.field] == "map" and 1 or 0.45) end
 	end
+	refs.minimapPing:SetChecked(db.minimapPing)
+	local outStyle = db.minimapShown == "map" or db.minimapHidden == "nodes" or db.minimapHidden == "map"
+	refs.minimapPing:SetAlpha(outStyle and 1 or 0.45)
 	local unlocked = FadeUI.IsRangeIconUnlocked()
 	refs.rangeMove.label:SetText(unlocked and "Lock" or "Move")
 	SetActive(refs.rangeMove, unlocked)
