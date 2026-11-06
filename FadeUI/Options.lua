@@ -246,6 +246,18 @@ local function ElementRow(parent, el)
 		row.extraH = 22
 	end
 
+	-- The "while dragging" switch covers every action bar, so it sits below the
+	-- last row of the group.
+	if el.key == "petbar" then
+		row.barsDrag = Checkbox(row, "Also show all action bars while you drag a spell or item", function(self)
+			FadeUI.SetBarsDrag(self:GetChecked())
+		end)
+		row.barsDrag:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 24, 0)
+		Tooltip(row.barsDrag, "Action bars: while dragging",
+			"Shows your action bars and pet bar whenever you pick up something you can put on them (a spell, item, macro...), whatever their mode above, so you can drop it into a slot. Not in combat.")
+		row.extraH = 22
+	end
+
 	local function over() hl:Show() end
 	local function out() hl:Hide() end
 	name:HookScript("OnEnter", over) name:HookScript("OnLeave", out)
@@ -620,6 +632,7 @@ function FadeUI.RefreshOptions()
 			row.bagsOpen:SetChecked(db.bagsOpen)
 			row.bagsOpen:SetAlpha((missing or current == "always") and 0.45 or 1)
 		end
+		if row.barsDrag then row.barsDrag:SetChecked(db.barsDrag) end
 		if missing then
 			row.label:SetText(row.el.label .. " |cff777777(not found)|r")
 			row.label:SetTextColor(0.5, 0.5, 0.5)

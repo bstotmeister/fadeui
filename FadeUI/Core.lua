@@ -90,17 +90,17 @@ for i = 1, 10 do
 end
 
 FadeUI.GROUPS = {
-	{ title = "Action bars", items = {
-		{ key = "bar1",   label = "Action Bar 1",       frames = { "MainActionBar", "MainMenuBar" }, default = "never" },
-		{ key = "bar2",   label = "Action Bar 2",       frames = { "MultiBarBottomLeft" },  default = "never" },
-		{ key = "bar3",   label = "Action Bar 3",       frames = { "MultiBarBottomRight" }, default = "never" },
-		{ key = "bar4",   label = "Action Bar 4",       frames = { "MultiBarRight" },       default = "never" },
-		{ key = "bar5",   label = "Action Bar 5",       frames = { "MultiBarLeft" },        default = "never" },
-		{ key = "bar6",   label = "Action Bar 6",       frames = { "MultiBar5" },           default = "never" },
-		{ key = "bar7",   label = "Action Bar 7",       frames = { "MultiBar6" },           default = "never" },
-		{ key = "bar8",   label = "Action Bar 8",       frames = { "MultiBar7" },           default = "never" },
+	{ title = "Action bars", bars = true, items = {
+		{ key = "bar1",   label = "Action Bar 1",       frames = { "MainActionBar", "MainMenuBar" }, default = "never", drag = true },
+		{ key = "bar2",   label = "Action Bar 2",       frames = { "MultiBarBottomLeft" },  default = "never", drag = true },
+		{ key = "bar3",   label = "Action Bar 3",       frames = { "MultiBarBottomRight" }, default = "never", drag = true },
+		{ key = "bar4",   label = "Action Bar 4",       frames = { "MultiBarRight" },       default = "never", drag = true },
+		{ key = "bar5",   label = "Action Bar 5",       frames = { "MultiBarLeft" },        default = "never", drag = true },
+		{ key = "bar6",   label = "Action Bar 6",       frames = { "MultiBar5" },           default = "never", drag = true },
+		{ key = "bar7",   label = "Action Bar 7",       frames = { "MultiBar6" },           default = "never", drag = true },
+		{ key = "bar8",   label = "Action Bar 8",       frames = { "MultiBar7" },           default = "never", drag = true },
 		{ key = "stance", label = "Stance / Form Bar",  frames = { "StanceBar" },           default = "never" },
-		{ key = "petbar", label = "Pet Bar",            frames = { "PetActionBar" },        default = "never" },
+		{ key = "petbar", label = "Pet Bar",            frames = { "PetActionBar" },        default = "never", drag = true },
 	}},
 	{ title = "Unit frames", items = {
 		{ key = "player",  label = "Player Frame",      frames = { "PlayerFrame" },         default = "target" },
@@ -138,6 +138,7 @@ local ELEMENTS, BY_KEY = {}, {}
 for _, group in ipairs(FadeUI.GROUPS) do
 	for _, el in ipairs(group.items) do
 		el.modes = el.modes or FadeUI.MODES
+		el.bar = group.bars -- shown in Quick Keybind Mode (see BarsPeek)
 		ELEMENTS[#ELEMENTS + 1] = el
 		BY_KEY[el.key] = el
 	end
@@ -163,6 +164,7 @@ local function Defaults(target)
 	target.fadeDelay = 50 -- wait before fading out, tenths of a second
 	target.chatIdle = 100 -- "When active" chat hides after this long without activity, tenths of a second
 	target.bagsOpen = true -- bag buttons also show while your bags are open
+	target.barsDrag = true -- action bars also show while you drag something onto them
 	target.rangeHelper = true    -- show a spell's icon after it fails out of range (RangeHelper.lua)
 	target.resourceHelper = true -- ...or short on mana/rage/energy
 	target.cooldownHelper = true -- ...or on cooldown (and shows the cooldown on the icon)
@@ -296,12 +298,19 @@ end
 -- Bag buttons are shown while your bags are open, if db.bagsOpen (see BagsChanged).
 local bagsOpen = false
 
+-- Action bars are shown while something that can go on them is on the cursor,
+-- if db.barsDrag, and while Quick Keybind Mode is open (see BarsPeek).
+local dragging = false
+local keybinding = false
+
 -- The holder's state driver changed to "show" or "hide". Secure holders run
 -- STATE_SNIPPET first, which has already shown them (or hidden them in combat).
 -- `now` skips the fade-out delay.
 local function Holder_State(h, state, now)
 	if h.fadeuiChat then state = ChatState(state) end
 	if h.fadeuiBags and bagsOpen and db.bagsOpen then state = "show" end
+	if h.fadeuiDrag and dragging and db.barsDrag then state = "show" end
+	if h.fadeuiBar and keybinding then state = "show" end
 	if h.fadeuiTimer then
 		h.fadeuiTimer:Cancel()
 		h.fadeuiTimer = nil
@@ -525,7 +534,8 @@ end
 
 -- Re-checks an element that can show outside its mode: chat comes back while
 -- you type, so you can see what you're writing, and hides once it has been idle
--- (see ChatState); bag buttons show while your bags are open.
+-- (see ChatState); bag buttons show while your bags are open; action bars show
+-- while you drag something onto them.
 function FadeUI.UpdatePeek(key)
 	local el = BY_KEY[key]
 	if not el or not db or not loggedIn then return end
@@ -586,6 +596,13 @@ local function BagsChanged()
 	end
 end
 
+-- Re-checks the action bars.
+local function BarsPeek()
+	for _, el in ipairs(ELEMENTS) do
+		if el.bar then FadeUI.UpdatePeek(el.key) end
+	end
+end
+
 -------------------------------------------------------------------------------
 -- Apply
 -------------------------------------------------------------------------------
@@ -618,6 +635,8 @@ function FadeUI.Apply()
 					local h = (el.direct and AttachDirect or Attach)(f)
 					h.fadeuiChat = el.key == "chat"
 					h.fadeuiBags = el.key == "bags"
+					h.fadeuiDrag = el.drag
+					h.fadeuiBar = el.bar
 					SetDriver(h, driver)
 				else
 					Detach(f)
@@ -629,6 +648,7 @@ function FadeUI.Apply()
 	ChatIdleCheck()
 	FadeUI.UpdatePeek("chat")
 	FadeUI.UpdatePeek("bags")
+	BarsPeek()
 	if FadeUI.RefreshMinimap then FadeUI.RefreshMinimap() end
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 end
@@ -723,6 +743,12 @@ function FadeUI.SetBagsOpen(on)
 	FadeUI.Changed()
 end
 
+function FadeUI.SetBarsDrag(on)
+	if not db then return end
+	db.barsDrag = on and true or false
+	FadeUI.Changed()
+end
+
 -- `field` is "fadeIn", "fadeOut", "fadeDelay", "chatIdle", "rangeTime", "resourceTime", "cooldownTime" or "cooldownBuffer"; `seconds` may be fractional.
 function FadeUI.SetTime(field, seconds)
 	if not db or type(seconds) ~= "number" then return end
@@ -762,6 +788,10 @@ events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("PLAYER_REGEN_DISABLED")
 events:RegisterEvent("PLAYER_REGEN_ENABLED")
 events:RegisterEvent("UPDATE_MACROS")
+events:RegisterEvent("ACTIONBAR_SHOWGRID") -- something that can go on an action bar was picked up
+events:RegisterEvent("ACTIONBAR_HIDEGRID") -- ...and was dropped
+events:RegisterEvent("PET_BAR_SHOWGRID")   -- the same, for pet actions
+events:RegisterEvent("PET_BAR_HIDEGRID")
 
 local firstRun = false
 
@@ -829,6 +859,14 @@ events:SetScript("OnEvent", function(_, event, arg1)
 			end
 		end
 
+		-- Quick Keybind Mode (from Settings or Edit Mode) shows every action bar,
+		-- so you can hover the buttons to bind them.
+		local qk = GetFrame("QuickKeybindFrame")
+		if qk then
+			qk:HookScript("OnShow", function() keybinding = true BarsPeek() end)
+			qk:HookScript("OnHide", function() keybinding = false BarsPeek() end)
+		end
+
 		-- Opening or closing a bag re-checks the bag buttons.
 		for _, name in ipairs(BAG_FRAMES) do
 			local f = GetFrame(name)
@@ -857,11 +895,17 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		-- The macro list may only arrive after login.
 		if loggedIn then RemoveOldMacros() end
 
+	elseif event == "ACTIONBAR_SHOWGRID" or event == "PET_BAR_SHOWGRID"
+		or event == "ACTIONBAR_HIDEGRID" or event == "PET_BAR_HIDEGRID" then
+		dragging = event == "ACTIONBAR_SHOWGRID" or event == "PET_BAR_SHOWGRID"
+		BarsPeek()
+
 	elseif event == "PLAYER_REGEN_DISABLED" then
 		if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if FadeUI.pendingApply then FadeUI.Apply() end
+		BarsPeek() -- a drag that ended in combat couldn't hide its bars
 		if pendingMacroCleanup then RemoveOldMacros() end
 		if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 	end
