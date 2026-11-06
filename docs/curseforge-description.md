@@ -34,7 +34,7 @@ Chat has its own modes instead: **Always**, **When active** (hides after a set n
 - **Group frames:** Party Frames, Raid Frames, Raid Manager Tab
 - **Everything else:** Minimap, Buffs, Debuffs, Quest Tracker, Chat, Menu Buttons, Bag Buttons, XP/Rep Bars, Cooldown Manager, Damage Meter
 
-Bag buttons can also show whenever your bags are open.
+Bag buttons can also show whenever your bags are open, and action bars show while you drag a spell or item onto them or use Quick Keybind Mode.
 
 ## Minimal minimap: just the nodes, or a clean circle
 
