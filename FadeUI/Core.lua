@@ -646,9 +646,10 @@ function FadeUI.Apply()
 	end
 
 	ChatIdleCheck()
-	FadeUI.UpdatePeek("chat")
-	FadeUI.UpdatePeek("bags")
-	BarsPeek()
+	-- Re-check every element: re-registering a state driver doesn't fire it when
+	-- its state is unchanged (e.g. "hide" before and after toggling FadeUI off and
+	-- on), so a holder shown while detached would otherwise stay shown.
+	for _, el in ipairs(ELEMENTS) do FadeUI.UpdatePeek(el.key) end
 	if FadeUI.RefreshMinimap then FadeUI.RefreshMinimap() end
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 end
@@ -905,7 +906,9 @@ events:SetScript("OnEvent", function(_, event, arg1)
 
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if FadeUI.pendingApply then FadeUI.Apply() end
-		BarsPeek() -- a drag that ended in combat couldn't hide its bars
+		-- A hide that came during combat (a drag or bags closed in combat, a fade
+		-- cut off by combat) couldn't happen then: re-check everything.
+		for _, el in ipairs(ELEMENTS) do FadeUI.UpdatePeek(el.key) end
 		if pendingMacroCleanup then RemoveOldMacros() end
 		if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 	end
