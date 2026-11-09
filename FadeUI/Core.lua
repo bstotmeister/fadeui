@@ -532,6 +532,16 @@ local function GetFrame(name)
 	end
 end
 
+-- Chattynator replaces Blizzard's chat with its own windows, all inside
+-- ChattynatorHyperlinkHandler, and borrows Blizzard's typing box. It hides the
+-- Blizzard chat windows itself, but only if they're still directly on UIParent,
+-- so with it loaded FadeUI leaves them alone and fades Chattynator instead.
+local CHATTYNATOR_FRAMES = { "ChattynatorHyperlinkHandler", "ChatFrame1EditBox" }
+
+local function UsingChattynator()
+	return GetFrame("ChattynatorHyperlinkHandler") ~= nil
+end
+
 -- Re-checks an element that can show outside its mode: chat comes back while
 -- you type, so you can see what you're writing, and hides once it has been idle
 -- (see ChatState); bag buttons show while your bags are open; action bars show
@@ -619,6 +629,8 @@ function FadeUI.Apply()
 		return
 	end
 	FadeUI.pendingApply = false
+
+	BY_KEY.chat.frames = UsingChattynator() and CHATTYNATOR_FRAMES or CHAT_FRAMES
 
 	local active = FadeUI.IsActive()
 	for _, el in ipairs(ELEMENTS) do
@@ -857,6 +869,18 @@ events:SetScript("OnEvent", function(_, event, arg1)
 					if self:IsShown() then FadeUI.ChatActivity() end
 				end)
 			end
+		end
+
+		-- Chattynator doesn't send messages to the Blizzard chat windows, so its
+		-- new lines count as activity instead. A modifier runs once per message as
+		-- a window draws it (hidden or not), and again for old ones scrolled back
+		-- to or redrawn, so only recent messages count.
+		if UsingChattynator() and Chattynator and Chattynator.API and Chattynator.API.AddModifier then
+			Chattynator.API.AddModifier(function(data)
+				if type(data) == "table" and type(data.timestamp) == "number" and time() - data.timestamp <= 2 then
+					FadeUI.ChatActivity()
+				end
+			end)
 		end
 
 		-- Quick Keybind Mode (from Settings or Edit Mode) shows every action bar,
