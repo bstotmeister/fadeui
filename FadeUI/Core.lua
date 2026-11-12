@@ -510,6 +510,22 @@ local function AttachDirect(frame)
 	return h
 end
 
+-- A frame that nothing else shows, hides or fades can be its own holder: it
+-- stays on its parent, for code that goes by its parent, and FadeUI shows,
+-- hides and fades the frame itself.
+local function AttachInPlace(frame)
+	if not holders[frame] then
+		frame.fadeuiFrame = frame
+		frame.FadeUI_State = Holder_State
+		frame:HookScript("OnAttributeChanged", Holder_OnAttributeChanged)
+		frame:HookScript("OnShow", Holder_OnShow)
+		frame:HookScript("OnHide", Holder_OnHide)
+		holders[frame] = frame
+	end
+	attached[frame] = true
+	return frame
+end
+
 local function Detach(frame)
 	local h = holders[frame]
 	attached[frame] = nil
@@ -537,6 +553,9 @@ end
 -- Blizzard chat windows itself, but only if they're still directly on UIParent,
 -- so with it loaded FadeUI leaves them alone and fades Chattynator instead.
 local CHATTYNATOR_FRAMES = { "ChattynatorHyperlinkHandler", "ChatFrame1EditBox" }
+-- Chattynator goes by that frame's parent too (it opens its copy-chat window
+-- there), so it stays where it is and is its own holder (see AttachInPlace).
+local IN_PLACE = { ChattynatorHyperlinkHandler = true }
 
 local function UsingChattynator()
 	return GetFrame("ChattynatorHyperlinkHandler") ~= nil
@@ -644,7 +663,7 @@ function FadeUI.Apply()
 			if f then
 				el.found = el.found + 1
 				if active then
-					local h = (el.direct and AttachDirect or Attach)(f)
+					local h = (el.direct and AttachDirect or IN_PLACE[name] and AttachInPlace or Attach)(f)
 					h.fadeuiChat = el.key == "chat"
 					h.fadeuiBags = el.key == "bags"
 					h.fadeuiDrag = el.drag
