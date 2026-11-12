@@ -32,6 +32,12 @@ local function Call(fn, ...)
 	if fn then xpcall(fn, geterrorhandler(), ...) end
 end
 
+-- Searching the options for an addon's name finds the elements it's part of.
+local function AddKeyword(el, spec)
+	el.keywords = el.keywords or {}
+	el.keywords[#el.keywords + 1] = spec.addon:lower()
+end
+
 function FadeUI.RegisterAddon(spec)
 	specs[#specs + 1] = spec
 	for _, el in ipairs(spec.elements or {}) do
@@ -50,10 +56,17 @@ function FadeUI.ActivateAddons()
 			for key, names in pairs(spec.frames or {}) do
 				local frames = FadeUI.BY_KEY[key].frames
 				for _, name in ipairs(names) do frames[#frames + 1] = name end
+				AddKeyword(FadeUI.BY_KEY[key], spec)
 			end
-			for key, names in pairs(spec.replace or {}) do FadeUI.BY_KEY[key].frames = names end
+			for key, names in pairs(spec.replace or {}) do
+				FadeUI.BY_KEY[key].frames = names
+				AddKeyword(FadeUI.BY_KEY[key], spec)
+			end
 			for name, style in pairs(spec.styles or {}) do FadeUI.FRAME_STYLE[name] = style end
-			for _, el in ipairs(spec.elements or {}) do el.available = true end
+			for _, el in ipairs(spec.elements or {}) do
+				el.available = true
+				AddKeyword(el, spec)
+			end
 			Call(spec.OnLogin)
 		end
 	end

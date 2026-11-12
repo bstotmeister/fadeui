@@ -331,11 +331,21 @@ local function ScrollArea(parent)
 	return sf, content
 end
 
+-- Whether an element's name, or the name of a loaded addon that's part of it
+-- (see AddKeyword in Addons.lua), contains `query`.
+local function Matches(el, query)
+	if el.label:lower():find(query, 1, true) then return true end
+	for _, word in ipairs(el.keywords or {}) do
+		if word:find(query, 1, true) then return true end
+	end
+	return false
+end
+
 -- Stacks the groups and rows that match `query` (case-insensitive, on the
--- element or group name) and hides the rest. An empty query shows everything,
--- except rows for addons that aren't loaded. The Custom frames group shows
--- even with no rows, for its add line. `keepScroll` stays where the list is
--- scrolled to instead of going back to the top.
+-- element, group or addon name) and hides the rest. An empty query shows
+-- everything, except rows for addons that aren't loaded. The Custom frames
+-- group shows even with no rows, for its add line. `keepScroll` stays where
+-- the list is scrolled to instead of going back to the top.
 local function Layout(query, keepScroll)
 	query = strtrim(query or ""):lower()
 	-- Keys of the matching elements, for "set all"; nil when not searching.
@@ -345,7 +355,7 @@ local function Layout(query, keepScroll)
 		local groupHit = query == "" or g.title:lower():find(query, 1, true)
 		local shown = {}
 		for _, row in ipairs(g.rows) do
-			local hit = row.el.available ~= false and (groupHit or row.el.label:lower():find(query, 1, true))
+			local hit = row.el.available ~= false and (groupHit or Matches(row.el, query))
 			row:SetShown(hit and true or false)
 			if hit then
 				shown[#shown + 1] = row
@@ -736,7 +746,7 @@ local function Build()
 	refs.search = SearchBox(cols, LABEL_W - 14, 18, "Search, e.g. map", Layout)
 	refs.search:SetPoint("LEFT", 2, 0)
 	Tooltip(refs.search, "Search",
-		"Type to filter the list by element or group name. Escape clears it.")
+		"Type to filter the list by element, group or addon name. Escape clears it.")
 	for i, mode in ipairs(FadeUI.MODES) do
 		local h = CreateFrame("Button", nil, cols)
 		h:SetSize(SEG_W, 18)
