@@ -17,6 +17,8 @@ local function Activity(data)
 	return true -- the tab still shows it
 end
 
+-- AddFilter keeps one filter per function, window and tab, and adding one
+-- that's already there does nothing, so watching again only adds new tabs.
 local function Watch()
 	local api = Chattynator and Chattynator.API
 	if not (api and api.AddFilter and api.GetWindowsAndTabs) then return end
