@@ -149,8 +149,7 @@ local function OnState(state)
 		hideTimer:Cancel()
 		hideTimer = nil
 	end
-	local db = FadeUI.GetDB()
-	local delay = db and (db.fadeDelay or 0) / 10 or 0
+	local delay = FadeUI.GetTime("minimap", "fadeDelay") / 10
 	if state == "show" or not shown or delay <= 0 then
 		shown = state == "show"
 		FadeUI.RefreshMinimap()
