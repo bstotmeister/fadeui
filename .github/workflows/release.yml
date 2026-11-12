@@ -16,6 +16,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      # CHANGELOG.md lists the tag's PRs, grouped by label (.github/release.yml). The
+      # packager uses it as the release notes (manual-changelog in .pkgmeta).
+      - name: Changelog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/changelog.sh "$GITHUB_REF_NAME"
+
       # Builds FadeUI-<tag>.zip, attaches it to a GitHub release, and uploads it to
       # CurseForge (project ID from FadeUI.toc) when the CF_API_KEY secret is set.
       - uses: BigWigsMods/packager@v2
@@ -24,18 +31,11 @@ jobs:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
 
-      # The packager fills the release body with whole commit messages. Replace it with
-      # GitHub's list of the release's PRs (grouped by label, see .github/release.yml),
-      # then close the milestone named after the tag.
-      - name: Release notes and milestone
+      - name: Close milestone
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          prev=$(git describe --tags --abbrev=0 "$TAG^")
-          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
-            -f tag_name="$TAG" -f previous_tag_name="$prev" --jq .body > notes.md
-          gh release edit "$TAG" --notes-file notes.md
           number=$(gh api "repos/$GITHUB_REPOSITORY/milestones" --jq ".[] | select(.title == \"$TAG\") | .number")
           if [ -n "$number" ]; then
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/milestones/$number" -f state=closed
