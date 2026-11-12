@@ -32,6 +32,8 @@ read_globals = {
 	"ERR_SPELL_COOLDOWN",
 	"ERR_SPELL_OUT_OF_RANGE",
 	"EventRegistry",
+	"FCF_GetCurrentFullScreenFrame",
+	"FrameUtil",
 	"GameTooltip",
 	"GetBindingKey",
 	"GetMacroInfo",
