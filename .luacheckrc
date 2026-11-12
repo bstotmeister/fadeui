@@ -22,6 +22,8 @@ globals = {
 -- WoW API it reads. Add new ones here as the addon starts using them.
 read_globals = {
 	"C_Spell",
+	"Chattynator",
+	"time",
 	"C_Timer",
 	"CreateColor",
 	"CreateFrame",
