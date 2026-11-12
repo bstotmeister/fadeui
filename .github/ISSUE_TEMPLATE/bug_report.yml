@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in FadeUI isn't working
+labels: [bug, triage]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: FadeUI version
+      description: Shown in the addon list or the CurseForge app.
+      placeholder: "1.4.0"
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Game client and version
+      placeholder: "WoW Forever 1.60.1"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Set Action Bar 1 to "In combat"
+        2. Enter combat
+        3. ...
+  - type: textarea
+    id: errors
+    attributes:
+      label: Lua errors
+      description: Paste from BugSack, or turn errors on with `/console scriptErrors 1`.
+      render: text
+  - type: textarea
+    id: addons
+    attributes:
+      label: Other addons loaded
+      description: Especially ones that change action bars, unit frames, the minimap or chat.

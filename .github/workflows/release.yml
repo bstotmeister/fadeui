@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write # close the release's milestone
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,3 +23,20 @@ jobs:
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+
+      # The packager fills the release body with whole commit messages. Replace it with
+      # GitHub's list of the release's PRs (grouped by label, see .github/release.yml),
+      # then close the milestone named after the tag.
+      - name: Release notes and milestone
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          prev=$(git describe --tags --abbrev=0 "$TAG^")
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$TAG" -f previous_tag_name="$prev" --jq .body > notes.md
+          gh release edit "$TAG" --notes-file notes.md
+          number=$(gh api "repos/$GITHUB_REPOSITORY/milestones" --jq ".[] | select(.title == \"$TAG\") | .number")
+          if [ -n "$number" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/milestones/$number" -f state=closed
+          fi
