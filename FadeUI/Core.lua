@@ -593,6 +593,24 @@ end
 -- haven't typed, for db.chatIdle.
 local chatLastActive, chatTimer = 0, nil
 
+-- Chattynator draws its own windows, so a filter on each of its tabs counts its
+-- messages instead. Chattynator runs it on each message the tab shows as it
+-- arrives, even one whose text is secret (in boss fights, Mythic+ and PvP), and
+-- again on older ones it redraws, so only recent messages count. Tabs added
+-- since are watched once chat next goes idle.
+local function ChattynatorActivity(data)
+	if type(data.timestamp) == "number" and time() - data.timestamp <= 2 then FadeUI.ChatActivity() end
+	return true -- the tab still shows it
+end
+
+local function WatchChattynator()
+	local api = UsingChattynator() and Chattynator and Chattynator.API
+	if not (api and api.AddFilter and api.GetWindowsAndTabs) then return end
+	for window, tabs in ipairs(api.GetWindowsAndTabs()) do
+		for tab in ipairs(tabs) do api.AddFilter(ChattynatorActivity, window, tab) end
+	end
+end
+
 local function ChatIdleCheck()
 	if chatTimer then
 		chatTimer:Cancel()
@@ -605,6 +623,7 @@ local function ChatIdleCheck()
 	if idle ~= chatIdle then
 		chatIdle = idle
 		FadeUI.UpdatePeek("chat")
+		if idle then WatchChattynator() end
 	end
 end
 
@@ -903,16 +922,8 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		end
 
 		-- Chattynator doesn't send messages to the Blizzard chat windows, so its
-		-- new lines count as activity instead. A modifier runs once per message as
-		-- a window draws it (hidden or not), and again for old ones scrolled back
-		-- to or redrawn, so only recent messages count.
-		if UsingChattynator() and Chattynator and Chattynator.API and Chattynator.API.AddModifier then
-			Chattynator.API.AddModifier(function(data)
-				if type(data) == "table" and type(data.timestamp) == "number" and time() - data.timestamp <= 2 then
-					FadeUI.ChatActivity()
-				end
-			end)
-		end
+		-- own count instead (see WatchChattynator).
+		WatchChattynator()
 
 		-- Quick Keybind Mode (from Settings or Edit Mode) shows every action bar,
 		-- so you can hover the buttons to bind them.
