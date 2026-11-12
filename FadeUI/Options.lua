@@ -443,7 +443,7 @@ local function Build()
 
 	-- Range, resource and cooldown helpers: they share one icon, and each has its own time
 	y = y - 26
-	local SHARED = "\n\nIt stays up while you tab through targets, and hides when you cast the spell or after the seconds set next to this. With both helpers on and both problems at once: red border around a dull icon."
+	local SHARED = "\n\nIt stays up while you tab through targets, and hides when you cast the spell or after the seconds set next to this. With both helpers on and both problems at once: red border around a dull icon. The icon is also dull while the spell can't be cast for another reason, like Charge in combat."
 	local function Helper(field, timeField, label, tip, timeTip, after)
 		local c = Checkbox(win, label, function(self) FadeUI.SetHelper(field, self:GetChecked()) end)
 		if after then
