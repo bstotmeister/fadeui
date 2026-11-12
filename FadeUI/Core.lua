@@ -174,9 +174,9 @@ local function Defaults(target)
 	target.cooldownBuffer = 20 -- a spell failing on cooldown this soon after you cast it is ignored, tenths of a second (0 = off)
 	target.rangePoint, target.rangeRelPoint, target.rangeX, target.rangeY = "CENTER", "CENTER", 0, -120
 	target.minimapShown = "normal" -- minimap style while shown: "normal" or "map" (Minimap.lua)
-	target.minimapHidden = "nodes" -- ...and while hidden: "none", "nodes" or "map"
+	target.minimapHidden = "map"   -- ...and while hidden: "none", "nodes" or "map"
 	target.minimapShownSize = 100  -- the map's size while shown, % of the minimap
-	target.minimapHiddenSize = 50  -- ...and while hidden
+	target.minimapHiddenSize = 65  -- ...and while hidden
 	target.minimapPing = true      -- clicking Nodes or Map pings, like the normal minimap (off: clicks go through)
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
