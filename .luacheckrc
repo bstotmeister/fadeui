@@ -21,6 +21,7 @@ globals = {
 
 -- WoW API it reads. Add new ones here as the addon starts using them.
 read_globals = {
+	"C_AddOns",
 	"C_Spell",
 	"Chattynator",
 	"time",
@@ -39,11 +40,14 @@ read_globals = {
 	"FrameUtil",
 	"GameTooltip",
 	"GetBindingKey",
+	"GetMouseFoci",
+	"GetMouseFocus",
 	"GetMacroInfo",
 	"GetNumMacros",
 	"GetTime",
 	"HybridMinimap",
 	"InCombatLockdown",
+	"IsAddOnLoaded",
 	"Minimap",
 	"MinimapCluster",
 	"NUM_CONTAINER_FRAMES",
@@ -54,6 +58,8 @@ read_globals = {
 	"UIParent",
 	"UISpecialFrames",
 	"UnregisterStateDriver",
+	"WorldFrame",
+	"geterrorhandler",
 	"issecretvalue",
 	"hooksecurefunc",
 	"strtrim",

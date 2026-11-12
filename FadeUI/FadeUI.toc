@@ -11,6 +11,9 @@
 ## AddonCompartmentFunc: FadeUI_OnAddonCompartmentClick
 
 Core.lua
+Addons.lua
+Custom.lua
+Addons\Addons.xml
 Options.lua
 RangeHelper.lua
 Minimap.lua

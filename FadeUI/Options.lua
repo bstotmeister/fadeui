@@ -182,6 +182,8 @@ local function GroupHeader(parent, title)
 	return h
 end
 
+-- Everything the row does goes by row.el, so a custom frame's row can be
+-- reused for another (see RefreshCustomRows).
 local function ElementRow(parent, el)
 	local row = CreateFrame("Frame", nil, parent)
 	row:SetPoint("RIGHT")
@@ -198,26 +200,39 @@ local function ElementRow(parent, el)
 	row.label = Text(name, "GameFontHighlight", el.label)
 	row.label:SetPoint("LEFT")
 	row.label:SetJustifyH("LEFT")
-	Tooltip(name, el.label, function()
+	Tooltip(name, function() return row.el.label end, function()
+		local e = row.el
 		local lines = {}
-		if el.found == 0 then
-			lines[#lines + 1] = "|cffff6060Not found in this game client, so this setting does nothing.|r"
+		if e.found == 0 then
+			lines[#lines + 1] = e.custom and "|cffff6060There's no frame with this name right now.|r"
+				or "|cffff6060Not found in this game client, so this setting does nothing.|r"
 		end
-		if el.note then lines[#lines + 1] = el.note end
-		lines[#lines + 1] = "|cff888888Frames: " .. table.concat(el.frames, ", ", 1, math.min(#el.frames, 6))
-			.. (#el.frames > 6 and ", ..." or "") .. "|r"
+		if e.note then lines[#lines + 1] = e.note end
+		lines[#lines + 1] = "|cff888888Frames: " .. table.concat(e.frames, ", ", 1, math.min(#e.frames, 6))
+			.. (#e.frames > 6 and ", ..." or "") .. "|r"
 		return table.concat(lines, "\n\n")
 	end)
 
 	row.segs = {}
 	for i, mode in ipairs(el.modes) do
 		local b = Button(row, mode.label, SEG_W, SEG_H, function()
-			FadeUI.SetMode(el.key, mode.key)
+			FadeUI.SetMode(row.el.key, mode.key)
 		end, mode.color)
 		b:SetPoint("LEFT", LABEL_W + (i - 1) * (SEG_W + SEG_GAP), 0)
 		b.mode = mode
-		Tooltip(b, el.label .. ": " .. mode.label, mode.tip)
+		Tooltip(b, function() return row.el.label .. ": " .. mode.label end, mode.tip)
 		row.segs[i] = b
+	end
+
+	-- A custom frame's row has a remove button at the end of its label.
+	if el.custom then
+		row.label:SetWidth(LABEL_W - 40)
+		row.label:SetWordWrap(false)
+		local remove = Button(row, "x", 18, 18, function() FadeUI.RemoveCustomFrame(row.el.frames[1]) end)
+		remove:SetPoint("LEFT", LABEL_W - 28, 0)
+		remove:SetFrameLevel(name:GetFrameLevel() + 1) -- above the label's button, which it sits on
+		Tooltip(remove, function() return "Remove " .. row.el.label end,
+			"FadeUI stops hiding this frame, and it goes back to normal.")
 	end
 
 	-- Chat's idle time sits in its row, after its buttons.
@@ -317,8 +332,11 @@ local function ScrollArea(parent)
 end
 
 -- Stacks the groups and rows that match `query` (case-insensitive, on the
--- element or group name) and hides the rest. An empty query shows everything.
-local function Layout(query)
+-- element or group name) and hides the rest. An empty query shows everything,
+-- except rows for addons that aren't loaded. The Custom frames group shows
+-- even with no rows, for its add line. `keepScroll` stays where the list is
+-- scrolled to instead of going back to the top.
+local function Layout(query, keepScroll)
 	query = strtrim(query or ""):lower()
 	-- Keys of the matching elements, for "set all"; nil when not searching.
 	refs.matches = query ~= "" and {} or nil
@@ -327,17 +345,18 @@ local function Layout(query)
 		local groupHit = query == "" or g.title:lower():find(query, 1, true)
 		local shown = {}
 		for _, row in ipairs(g.rows) do
-			local hit = groupHit or row.el.label:lower():find(query, 1, true)
+			local hit = row.el.available ~= false and (groupHit or row.el.label:lower():find(query, 1, true))
 			row:SetShown(hit and true or false)
 			if hit then
 				shown[#shown + 1] = row
 				if refs.matches then refs.matches[row.el.key] = true end
 			end
 		end
-		g.header:SetShown(#shown > 0)
-		if #shown > 0 then
+		local showGroup = #shown > 0 or (g.custom and groupHit)
+		g.header:SetShown(showGroup and true or false)
+		if showGroup then
 			g.header:SetPoint("TOPLEFT", 0, cy)
-			cy = cy - GROUP_H
+			cy = cy - g.header:GetHeight()
 			for _, row in ipairs(shown) do
 				row:SetPoint("TOPLEFT", 0, cy)
 				cy = cy - ROW_H - (row.extraH or 0)
@@ -347,8 +366,168 @@ local function Layout(query)
 	end
 	refs.noMatch:SetShown(cy == 0)
 	refs.content:SetHeight(math.max(GROUP_H, -cy))
-	refs.scroll:SetVerticalScroll(0)
+	local max = math.max(0, refs.content:GetHeight() - refs.scroll:GetHeight())
+	refs.scroll:SetVerticalScroll(keepScroll and math.min(refs.scroll:GetVerticalScroll(), max) or 0)
 	refs.scroll.UpdateThumb()
+end
+
+-------------------------------------------------------------------------------
+-- Custom frames
+-------------------------------------------------------------------------------
+
+-- Custom frames' rows come and go, and frames can't be deleted, so rows are
+-- reused. Unused ones are hidden and marked spare.
+local customRows = {}
+
+function FadeUI.RefreshCustomRows()
+	local g = refs.customGroup
+	if not g then return end
+	g.rows = {}
+	for i, el in ipairs(g.group.items) do
+		local row = customRows[i]
+		if not row then
+			row = ElementRow(refs.content, el)
+			customRows[i] = row
+		end
+		row.el, row.spare = el, nil
+		g.rows[i] = row
+	end
+	for i = #g.group.items + 1, #customRows do
+		customRows[i].spare = true
+		customRows[i]:Hide()
+	end
+	Layout(refs.search:GetText(), true)
+	FadeUI.RefreshOptions()
+end
+
+-- Picking a frame with the mouse. The bar takes the keyboard but not the mouse,
+-- so the mouse still finds the frame under it; a click would also click that
+-- frame (and cast from an action button), so Enter picks it instead.
+local picker
+
+-- The frame to add for what's under the mouse: the outermost frame with a
+-- name that it's in, below UIParent (an addon's window rather than one of its
+-- buttons). It must be a global by that name, so it can be found again.
+local function PickCandidate()
+	local focus = GetMouseFoci and GetMouseFoci()[1] or GetMouseFocus and GetMouseFocus()
+	local pick
+	while type(focus) == "table" and focus ~= UIParent and focus ~= WorldFrame do
+		if focus.IsForbidden and focus:IsForbidden() then return nil end
+		local name = focus.GetName and focus:GetName()
+		if name and _G[name] == focus then pick = focus end
+		focus = focus.GetParent and focus:GetParent()
+	end
+	return pick
+end
+
+local function StopPicking(name)
+	picker:Hide()
+	local done = picker.done
+	picker.done = nil
+	if done then done(name) end
+end
+
+-- Calls `done` with the picked frame's name, or nil if it was cancelled.
+local function PickFrame(done)
+	if not picker then
+		picker = CreateFrame("Frame", nil, UIParent)
+		picker:SetFrameStrata("FULLSCREEN_DIALOG")
+		picker:SetSize(520, 48)
+		picker:SetPoint("TOP", 0, -80)
+		Fill(picker, "BACKGROUND", BG, 0.95)
+		Outline(picker, ACCENT)
+		local hint = Text(picker, "GameFontHighlight", "Hover the frame to add and press |cffffffffEnter|r. |cffffffffEscape|r cancels.")
+		hint:SetPoint("TOP", 0, -9)
+		picker.text = Text(picker, "GameFontHighlightSmall", "", MUTED)
+		picker.text:SetPoint("BOTTOM", 0, 9)
+		-- An outline around the frame that would be picked, placed by position
+		-- rather than anchored to it (anchoring to a protected frame would make
+		-- this protected too).
+		picker.box = CreateFrame("Frame", nil, picker)
+		Outline(picker.box, ACCENT)
+		picker:EnableKeyboard(true)
+		picker:SetScript("OnKeyDown", function(self, key)
+			if key == "ESCAPE" then
+				StopPicking(nil)
+			elseif key == "ENTER" and self.name then
+				StopPicking(self.name)
+			end
+		end)
+		picker:SetScript("OnUpdate", function(self)
+			local f = PickCandidate()
+			self.name = f and f:GetName()
+			self.text:SetText(f and ("Under the mouse: |cffffffff" .. self.name .. "|r")
+				or "Under the mouse: nothing with a name (type the name instead, see /fstack)")
+			local l, b, w, h
+			if f then l, b, w, h = f:GetRect() end
+			if l then
+				local s = f:GetEffectiveScale() / self.box:GetEffectiveScale()
+				self.box:ClearAllPoints()
+				self.box:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l * s, b * s)
+				self.box:SetSize(w * s, h * s)
+				self.box:Show()
+			else
+				self.box:Hide()
+			end
+		end)
+		-- It takes every key, so it gives up as combat starts.
+		picker:RegisterEvent("PLAYER_REGEN_DISABLED")
+		picker:SetScript("OnEvent", function(self)
+			if self:IsShown() then StopPicking(nil) end
+		end)
+		picker:Hide()
+	end
+	picker.done = done
+	picker:Show()
+end
+
+-- The Custom frames header holds the add line: a name box, Add, Pick, and what
+-- happened last.
+local function CustomAddLine(header)
+	header:SetHeight(GROUP_H + 26)
+	local msg = Text(header, "GameFontHighlightSmall", "", MUTED)
+	local function Say(text, bad)
+		msg:SetText(text or "")
+		if bad then msg:SetTextColor(1, 0.45, 0.45) else msg:SetTextColor(MUTED[1], MUTED[2], MUTED[3]) end
+	end
+
+	local box = SearchBox(header, LABEL_W - 14, SEG_H, "Frame name (see /fstack)", function() Say("") end)
+	box:SetMaxLetters(80)
+	box:SetPoint("TOPLEFT", 8, -GROUP_H - 2)
+	local function Add()
+		local ok, text = FadeUI.AddCustomFrame(box:GetText())
+		if ok then box:SetText("") end
+		box:ClearFocus()
+		Say(text, not ok)
+	end
+	box:SetScript("OnEnterPressed", Add)
+	Tooltip(box, "Add a custom frame",
+		"The name of a frame FadeUI doesn't have a setting for, such as another addon's window. Type /fstack and hover it to see its name, or click Pick.")
+
+	local add = Button(header, "Add", 52, SEG_H, Add)
+	add:SetPoint("LEFT", box, "RIGHT", 8, 0)
+	Tooltip(add, "Add", "Adds the frame named in the box. It gets a row below, with the same modes as everything else.")
+
+	local pick = Button(header, "Pick", 52, SEG_H, function()
+		if InCombatLockdown() then return Say("You can't pick a frame in combat.", true) end
+		win:Hide()
+		PickFrame(function(name)
+			win:Show()
+			if name then
+				box:SetText(name)
+				box:SetFocus()
+				Say("Press Enter to add " .. name .. ", or change the name first.")
+			end
+		end)
+	end)
+	pick:SetPoint("LEFT", add, "RIGHT", SEG_GAP, 0)
+	Tooltip(pick, "Pick",
+		"Hides this window so you can hover the frame you want, then press Enter to put its name in the box. Escape cancels. Frames that don't take the mouse can't be picked: type their name instead.")
+
+	msg:SetPoint("LEFT", pick, "RIGHT", 12, 0)
+	msg:SetPoint("RIGHT", header, "RIGHT", -4, 0)
+	msg:SetJustifyH("LEFT")
+	msg:SetWordWrap(false)
 end
 
 -------------------------------------------------------------------------------
@@ -376,7 +555,11 @@ local function Build()
 	win:RegisterForDrag("LeftButton")
 	win:SetScript("OnDragStart", win.StartMoving)
 	win:SetScript("OnDragStop", win.StopMovingOrSizing)
-	win:SetScript("OnShow", function() FadeUI.RefreshOptions() end)
+	win:SetScript("OnShow", function()
+		-- A custom frame that wasn't there may be now.
+		if FadeUI.CustomMissing() then FadeUI.Apply() end
+		FadeUI.RefreshOptions()
+	end)
 	Fill(win, "BACKGROUND", BG, 0.97)
 	Outline(win, LINE)
 	tinsert(UISpecialFrames, "FadeUIOptions") -- Escape closes it
@@ -581,15 +764,21 @@ local function Build()
 	refs.content = content
 
 	for _, group in ipairs(FadeUI.GROUPS) do
-		local g = { title = group.title, header = GroupHeader(content, group.title), rows = {} }
-		for _, el in ipairs(group.items) do
-			g.rows[#g.rows + 1] = ElementRow(content, el)
+		local g = { title = group.title, header = GroupHeader(content, group.title), rows = {}, group = group }
+		if group.custom then
+			-- Its rows are made by RefreshCustomRows.
+			g.custom = true
+			CustomAddLine(g.header)
+			refs.customGroup = g
+		else
+			for _, el in ipairs(group.items) do
+				g.rows[#g.rows + 1] = ElementRow(content, el)
+			end
 		end
 		groups[#groups + 1] = g
 	end
 	refs.noMatch = Text(content, "GameFontDisable", "No matching elements.")
 	refs.noMatch:SetPoint("TOPLEFT", 8, -10)
-	Layout("")
 
 	-- Footer
 	local foot = CreateFrame("Frame", nil, win)
@@ -603,6 +792,10 @@ local function Build()
 	reset:SetPoint("LEFT", PAD - 1, 0)
 	refs.keyHint = Text(foot, "GameFontHighlightSmall", "", MUTED)
 	refs.keyHint:SetPoint("RIGHT", -PAD, 0)
+
+	-- Last, since it refreshes the whole window: makes the custom frame rows and
+	-- lays out the list.
+	FadeUI.RefreshCustomRows()
 end
 
 -------------------------------------------------------------------------------
@@ -621,24 +814,26 @@ function FadeUI.RefreshOptions()
 	end
 
 	for _, row in ipairs(rows) do
-		local current = db.modes[row.el.key]
-		local missing = row.el.found == 0
-		for _, b in ipairs(row.segs) do
-			SetActive(b, b.mode.key == current)
-			b:SetAlpha(missing and 0.45 or 1)
-		end
-		if row.idle then row.idle:SetAlpha(current == "active" and 1 or 0.45) end
-		if row.bagsOpen then
-			row.bagsOpen:SetChecked(db.bagsOpen)
-			row.bagsOpen:SetAlpha((missing or current == "always") and 0.45 or 1)
-		end
-		if row.barsDrag then row.barsDrag:SetChecked(db.barsDrag) end
-		if missing then
-			row.label:SetText(row.el.label .. " |cff777777(not found)|r")
-			row.label:SetTextColor(0.5, 0.5, 0.5)
-		else
-			row.label:SetText(row.el.label)
-			row.label:SetTextColor(0.92, 0.92, 0.92)
+		if not row.spare then -- spare: an unused custom frame row
+			local current = db.modes[row.el.key]
+			local missing = row.el.found == 0
+			for _, b in ipairs(row.segs) do
+				SetActive(b, b.mode.key == current)
+				b:SetAlpha(missing and 0.45 or 1)
+			end
+			if row.idle then row.idle:SetAlpha(current == "active" and 1 or 0.45) end
+			if row.bagsOpen then
+				row.bagsOpen:SetChecked(db.bagsOpen)
+				row.bagsOpen:SetAlpha((missing or current == "always") and 0.45 or 1)
+			end
+			if row.barsDrag then row.barsDrag:SetChecked(db.barsDrag) end
+			if missing then
+				row.label:SetText(row.el.label .. " |cff777777(not found)|r")
+				row.label:SetTextColor(0.5, 0.5, 0.5)
+			else
+				row.label:SetText(row.el.label)
+				row.label:SetTextColor(0.92, 0.92, 0.92)
+			end
 		end
 	end
 
