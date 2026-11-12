@@ -100,11 +100,14 @@ FadeUI.GROUPS = {
 		{ key = "bar7",   label = "Action Bar 7",       frames = { "MultiBar6" },           default = "never", drag = true },
 		{ key = "bar8",   label = "Action Bar 8",       frames = { "MultiBar7" },           default = "never", drag = true },
 		{ key = "stance", label = "Stance / Form Bar",  frames = { "StanceBar" },           default = "never" },
+		{ key = "totembar", label = "Totem Bar",        frames = { "MultiCastActionBarFrame" }, default = "combat", drag = true },
 		{ key = "petbar", label = "Pet Bar",            frames = { "PetActionBar" },        default = "never", drag = true },
 	}},
 	{ title = "Unit frames", items = {
 		{ key = "player",  label = "Player Frame",      frames = { "PlayerFrame" },         default = "target" },
 		{ key = "pet",     label = "Pet Frame",         frames = { "PetFrame" },            default = "target" },
+		{ key = "totems",  label = "Totem Timers",      frames = { "TotemFrame" },          default = "target",
+		  note = "Only appears while you have a totem out. Sits under the Player Frame, so it is also hidden whenever that is." },
 		{ key = "target",  label = "Target Frame",      frames = { "TargetFrame" },         default = "target" },
 		{ key = "tot",     label = "Target of Target",  frames = { "TargetFrameToT" },      default = "target",
 		  note = "Sits inside the Target Frame, so it is also hidden whenever that is." },
@@ -178,9 +181,9 @@ local function Defaults(target)
 	target.cooldownBuffer = 20 -- a spell failing on cooldown this soon after you cast it is ignored, tenths of a second (0 = off)
 	target.rangePoint, target.rangeRelPoint, target.rangeX, target.rangeY = "CENTER", "CENTER", 0, -120
 	target.minimapShown = "normal" -- minimap style while shown: "normal" or "map" (Minimap.lua)
-	target.minimapHidden = "nodes" -- ...and while hidden: "none", "nodes" or "map"
+	target.minimapHidden = "map"   -- ...and while hidden: "none", "nodes" or "map"
 	target.minimapShownSize = 100  -- the map's size while shown, % of the minimap
-	target.minimapHiddenSize = 50  -- ...and while hidden
+	target.minimapHiddenSize = 65  -- ...and while hidden
 	target.minimapPing = true      -- clicking Nodes or Map pings, like the normal minimap (off: clicks go through)
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
@@ -514,6 +517,32 @@ local function AttachDirect(frame)
 	return h
 end
 
+-- A frame that nothing else shows, hides or fades can be its own holder: it
+-- stays on its parent, for code that goes by its parent, and FadeUI shows,
+-- hides and fades the frame itself.
+local function AttachInPlace(frame)
+	if not holders[frame] then
+		frame.fadeuiFrame = frame
+		frame.FadeUI_State = Holder_State
+		frame:HookScript("OnAttributeChanged", Holder_OnAttributeChanged)
+		frame:HookScript("OnShow", Holder_OnShow)
+		frame:HookScript("OnHide", Holder_OnHide)
+		holders[frame] = frame
+	end
+	attached[frame] = true
+	return frame
+end
+
+-- Whether a frame would be on screen if FadeUI weren't hiding it: it and
+-- everything it's in are shown, up to its holder.
+local function ShownApartFromFadeUI(frame)
+	while frame and not (frame.fadeuiFrame and holders[frame.fadeuiFrame] == frame) do
+		if not frame:IsShown() then return false end
+		frame = frame:GetParent()
+	end
+	return true
+end
+
 local function Detach(frame)
 	local h = holders[frame]
 	attached[frame] = nil
@@ -534,6 +563,19 @@ local function GetFrame(name)
 	if type(f) == "table" and f.GetParent and f.SetParent and not (f.IsForbidden and f:IsForbidden()) then
 		return f
 	end
+end
+
+-- Chattynator replaces Blizzard's chat with its own windows, all inside
+-- ChattynatorHyperlinkHandler, and borrows Blizzard's typing box. It hides the
+-- Blizzard chat windows itself, but only if they're still directly on UIParent,
+-- so with it loaded FadeUI leaves them alone and fades Chattynator instead.
+local CHATTYNATOR_FRAMES = { "ChattynatorHyperlinkHandler", "ChatFrame1EditBox" }
+-- Chattynator goes by that frame's parent too (it opens its copy-chat window
+-- there), so it stays where it is and is its own holder (see AttachInPlace).
+local IN_PLACE = { ChattynatorHyperlinkHandler = true }
+
+local function UsingChattynator()
+	return GetFrame("ChattynatorHyperlinkHandler") ~= nil
 end
 
 -- Re-checks an element that can show outside its mode: chat comes back while
@@ -559,6 +601,24 @@ end
 -- haven't typed, for db.chatIdle.
 local chatLastActive, chatTimer = 0, nil
 
+-- Chattynator draws its own windows, so a filter on each of its tabs counts its
+-- messages instead. Chattynator runs it on each message the tab shows as it
+-- arrives, even one whose text is secret (in boss fights, Mythic+ and PvP), and
+-- again on older ones it redraws, so only recent messages count. Tabs added
+-- since are watched once chat next goes idle.
+local function ChattynatorActivity(data)
+	if type(data.timestamp) == "number" and time() - data.timestamp <= 2 then FadeUI.ChatActivity() end
+	return true -- the tab still shows it
+end
+
+local function WatchChattynator()
+	local api = UsingChattynator() and Chattynator and Chattynator.API
+	if not (api and api.AddFilter and api.GetWindowsAndTabs) then return end
+	for window, tabs in ipairs(api.GetWindowsAndTabs()) do
+		for tab in ipairs(tabs) do api.AddFilter(ChattynatorActivity, window, tab) end
+	end
+end
+
 local function ChatIdleCheck()
 	if chatTimer then
 		chatTimer:Cancel()
@@ -571,6 +631,7 @@ local function ChatIdleCheck()
 	if idle ~= chatIdle then
 		chatIdle = idle
 		FadeUI.UpdatePeek("chat")
+		if idle then WatchChattynator() end
 	end
 end
 
@@ -625,6 +686,8 @@ function FadeUI.Apply()
 	end
 	FadeUI.pendingApply = false
 
+	BY_KEY.chat.frames = UsingChattynator() and CHATTYNATOR_FRAMES or CHAT_FRAMES
+
 	local active = FadeUI.IsActive()
 	for _, el in ipairs(ELEMENTS) do
 		el.found = 0
@@ -639,7 +702,7 @@ function FadeUI.Apply()
 				if active then
 					-- `direct` and `secure` are true for every frame, or a set of names.
 					local direct = el.direct == true or (el.direct and el.direct[name])
-					local h = direct and AttachDirect(f) or Attach(f, el.secure and el.secure[name])
+					local h = direct and AttachDirect(f) or IN_PLACE[name] and AttachInPlace(f) or Attach(f, el.secure and el.secure[name])
 					h.fadeuiChat = el.key == "chat"
 					h.fadeuiBags = el.key == "bags"
 					h.fadeuiDrag = el.drag
@@ -858,14 +921,20 @@ events:SetScript("OnEvent", function(_, event, arg1)
 				box:HookScript("OnEditFocusLost", StopTyping)
 			end
 			-- New lines in a chat window you can see (the selected tab, or an
-			-- undocked window) count as chat activity.
+			-- undocked window) count as chat activity. Chattynator keeps these
+			-- windows shown but inside hidden frames, and shows the combat log in
+			-- one of its tabs, so everything the window is in has to be shown too.
 			local f = GetFrame("ChatFrame" .. i)
 			if f and f.AddMessage then
 				hooksecurefunc(f, "AddMessage", function(self)
-					if self:IsShown() then FadeUI.ChatActivity() end
+					if ShownApartFromFadeUI(self) then FadeUI.ChatActivity() end
 				end)
 			end
 		end
+
+		-- Chattynator doesn't send messages to the Blizzard chat windows, so its
+		-- own count instead (see WatchChattynator).
+		WatchChattynator()
 
 		-- Quick Keybind Mode (from Settings or Edit Mode) shows every action bar,
 		-- so you can hover the buttons to bind them.

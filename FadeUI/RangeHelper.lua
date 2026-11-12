@@ -7,7 +7,9 @@
 --   Range is the border: red out of range, green in range. Resource is the icon:
 --   dull (grayed and darker) while you're short on mana/rage/energy. Out of range
 --   with enough resource also tints the icon red; with both, the icon stays dull
---   inside the red border, so both show. When it's ready it flashes and turns
+--   inside the red border, so both show. The icon is also dull while the spell
+--   can't be cast for another reason (e.g. Charge in combat), whichever helper
+--   showed it. When it's ready it flashes and turns
 --   normal. Cooldown is the action bars' sweep and countdown over the icon, with
 --   their bling when it ends. It hides when you cast that spell, or after the
 --   helper's time (rangeTime, resourceTime, cooldownTime) has passed since the
@@ -108,12 +110,20 @@ local function ShortOnResource(id)
 	return not issecret(noPower) and noPower == true
 end
 
+-- Can't be cast right now for a reason other than resource (e.g. Charge in
+-- combat). Cooldowns don't count: the game's usable check ignores them.
+local function UnusableOtherwise(id)
+	local usable, noPower = C_Spell.IsSpellUsable(id)
+	return not (issecret(usable) or issecret(noPower)) and usable == false and not noPower
+end
+
 -- Range is the border, resource is the icon; each only while its helper is on.
+-- Unusable for another reason dulls the icon whichever helper showed it.
 local function Update()
 	local db = FadeUI.GetDB()
 	local r -- nil: no range to show
 	if db.rangeHelper then r = C_Spell.IsSpellInRange(spell, "target") end
-	local dull = db.resourceHelper and ShortOnResource(spell)
+	local dull = db.resourceHelper and ShortOnResource(spell) or UnusableOtherwise(spell)
 	icon:SetDesaturated(dull)
 	if issecret(r) then
 		if icon.SetVertexColorFromBoolean then
