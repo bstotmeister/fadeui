@@ -46,6 +46,7 @@ into that release.
    to build `FadeUI-vX.Y.Z.zip` (dev files are excluded by `.pkgmeta`). It then creates the
    GitHub release, with notes that list the release's PRs, and closes the milestone.
 3. Upload to CurseForge from your machine. CI doesn't do this. Put `CF_API_KEY=...` in a
-   gitignored `.env` at the repo root, check out the tag, and run
-   `/opt/homebrew/bin/bash scripts/release.sh`. It needs bash 4.3+ (`brew install bash`);
-   `-d` builds without uploading.
+   gitignored `.env` at the repo root, check out the tag, and run `scripts/curseforge.sh`.
+   It writes `CHANGELOG.md` (the same PR list as the GitHub release), then runs the
+   packager's `scripts/release.sh`, which needs bash 4.3+ (`brew install bash`). Pass
+   `-d` to build without uploading.

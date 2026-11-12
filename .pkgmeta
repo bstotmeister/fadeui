@@ -4,6 +4,12 @@ package-as: FadeUI
 move-folders:
   FadeUI/FadeUI: FadeUI
 
+# Written by scripts/changelog.sh (the tag's PRs) before packaging. It's the release
+# notes on GitHub and the changelog on CurseForge.
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 ignore:
   - README.md
   - .luacheckrc

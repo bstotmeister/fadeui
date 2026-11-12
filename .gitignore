@@ -2,3 +2,4 @@
 *.zip
 .release/
 .env
+CHANGELOG.md
