@@ -24,23 +24,7 @@ scripts/link.sh _retail_       # or any other flavor folder
 
 Set `WOW_DIR` if WoW isn't installed at `/Applications/World of Warcraft`.
 
-## Checks
+## Contributing
 
-Every push and pull request to `main` runs [luacheck](https://github.com/lunarmodules/luacheck)
-on `FadeUI/` (config in `.luacheckrc`). Work happens on branches off `main`, merged back by pull request.
-
-## Releasing
-
-Bump `## Version` in `FadeUI/FadeUI.toc`, then push a tag:
-
-```sh
-git tag v1.0.1 && git push origin v1.0.1
-```
-
-GitHub Actions runs the [BigWigs packager](https://github.com/BigWigsMods/packager),
-which builds `FadeUI-v1.0.1.zip` (excluding dev files listed in `.pkgmeta`), attaches it
-to a GitHub release, and uploads it to CurseForge using the `CF_API_KEY` repo secret.
-
-To release from your machine instead (needs bash 4.3+, e.g. `brew install bash`), put
-`CF_API_KEY=...` in a gitignored `.env` file at the repo root, check out the tag, and run
-`scripts/release.sh` (a copy of the packager's [`release.sh`](https://github.com/BigWigsMods/packager/blob/master/release.sh)).
+Report bugs and request features with the [issue forms](https://github.com/bstotmeister/fadeui/issues/new/choose).
+For branches, pull requests, labels, milestones and releasing, see [CONTRIBUTING](.github/CONTRIBUTING.md).

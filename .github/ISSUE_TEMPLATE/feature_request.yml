@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest a new option, element or addon integration
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like?
+    validations:
+      required: true
+  - type: input
+    id: elements
+    attributes:
+      label: Which UI element(s)?
+      placeholder: "Minimap, Action Bar 1, another addon's frame..."
+  - type: textarea
+    id: why
+    attributes:
+      label: Why?
+      description: The situation where you'd use it.
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else

@@ -1,0 +1,15 @@
+# Categories for GitHub's generated release notes (used by the Release workflow).
+changelog:
+  exclude:
+    labels: [duplicate, invalid, wontfix]
+  categories:
+    - title: New features
+      labels: [enhancement]
+    - title: Addon compatibility
+      labels: [compatibility]
+    - title: Bug fixes
+      labels: [bug]
+    - title: Documentation
+      labels: [documentation]
+    - title: Other changes
+      labels: ["*"]
