@@ -24,6 +24,7 @@ read_globals = {
 	"C_Spell",
 	"Chattynator",
 	"time",
+	"Questie",
 	"C_Timer",
 	"CreateColor",
 	"CreateFrame",
