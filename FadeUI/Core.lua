@@ -641,6 +641,30 @@ function FadeUI.ChatActivity()
 	if chatIdle or not chatTimer then ChatIdleCheck() end
 end
 
+-- Blizzard moves chat onto a full-screen frame (the House Editor) and back, but
+-- only the frames still directly on the one it's moving them from, so it skips
+-- frames inside holders. Their holders are moved instead.
+local FULL_SCREEN_CHAT = { GeneralDockManager = true, QuickJoinToastButton = true }
+for i = 1, 10 do
+	FULL_SCREEN_CHAT["ChatFrame" .. i] = true
+	FULL_SCREEN_CHAT["ChatFrame" .. i .. "Tab"] = true
+	FULL_SCREEN_CHAT["ChatFrame" .. i .. "EditBox"] = true
+end
+local fullScreen, lastFullScreen = UIParent, nil
+
+local function FollowFullScreen()
+	local current = FCF_GetCurrentFullScreenFrame()
+	if current ~= fullScreen then fullScreen, lastFullScreen = current, fullScreen end
+	if not lastFullScreen then return end
+	for name in pairs(FULL_SCREEN_CHAT) do
+		local f = GetFrame(name)
+		local h = f and holders[f]
+		if h and f:GetParent() == h and h:GetParent() == lastFullScreen and not (InCombatLockdown() and h:IsProtected()) then
+			FrameUtil.SetParentMaintainRenderLayering(h, fullScreen)
+		end
+	end
+end
+
 -- Your bags are open while any bag window is shown.
 local BAG_FRAMES = { "ContainerFrameCombinedBags" }
 for i = 1, NUM_CONTAINER_FRAMES or 13 do
@@ -956,6 +980,14 @@ events:SetScript("OnEvent", function(_, event, arg1)
 				f:HookScript("OnShow", BagsChanged)
 				f:HookScript("OnHide", BagsChanged)
 			end
+		end
+
+		-- Holders go with chat to a full-screen frame and back (see FollowFullScreen).
+		-- The last one catches a chat window opened while it's up.
+		if FCF_GetCurrentFullScreenFrame then
+			hooksecurefunc("FCF_SetFullScreenFrame", FollowFullScreen)
+			hooksecurefunc("FCF_ClearFullScreenFrame", FollowFullScreen)
+			hooksecurefunc("FCF_UpdateChatFrameParent", FollowFullScreen)
 		end
 
 		if EventRegistry and EventRegistry.RegisterCallback then
