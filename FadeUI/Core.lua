@@ -123,7 +123,11 @@ FadeUI.GROUPS = {
 		{ key = "minimap", label = "Minimap",           frames = { "MinimapCluster" },      default = "target" },
 		{ key = "buffs",   label = "Buffs",             frames = { "BuffFrame" },           default = "target" },
 		{ key = "debuffs", label = "Debuffs",           frames = { "DebuffFrame" },         default = "combat" },
-		{ key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "target", direct = true },
+		-- Questie hides Blizzard's tracker and shows its own (Questie_BaseFrame), which
+		-- isn't managed, so it goes in a holder and fades. Its quest item buttons make
+		-- it protected on and off, so its holder is always secure.
+		{ key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame", "Questie_BaseFrame" }, default = "target",
+		  direct = { ObjectiveTrackerFrame = true }, secure = { Questie_BaseFrame = true } },
 		{ key = "chat",    label = "Chat",              frames = CHAT_FRAMES,               default = "active", modes = FadeUI.CHAT_MODES,
 		  note = "Chat always comes back while you are typing a message." },
 		{ key = "micro",   label = "Menu Buttons",      frames = { "MicroMenuContainer" },  default = "never" },
@@ -426,7 +430,7 @@ local function HookManagedContainer(frame)
 	end)
 end
 
-local function Attach(frame)
+local function Attach(frame, secure)
 	local h = holders[frame]
 	local parent = frame:GetParent() or UIParent
 	if h and parent == h then
@@ -440,7 +444,7 @@ local function Attach(frame)
 		-- Holders of protected frames (action bars...) need a secure handler to
 		-- be shown and hidden in combat. Others stay plain, so chat can still
 		-- peek in combat.
-		local secure = frame:IsProtected()
+		secure = secure or frame:IsProtected()
 		h = CreateFrame("Frame", nil, parent, secure and "SecureHandlerStateTemplate" or nil)
 		if secure then
 			h:SetAttribute("_onstate-fadeui", STATE_SNIPPET)
@@ -633,7 +637,9 @@ function FadeUI.Apply()
 			if f then
 				el.found = el.found + 1
 				if active then
-					local h = (el.direct and AttachDirect or Attach)(f)
+					-- `direct` and `secure` are true for every frame, or a set of names.
+					local direct = el.direct == true or (el.direct and el.direct[name])
+					local h = direct and AttachDirect(f) or Attach(f, el.secure and el.secure[name])
 					h.fadeuiChat = el.key == "chat"
 					h.fadeuiBags = el.key == "bags"
 					h.fadeuiDrag = el.drag
@@ -867,6 +873,11 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		if qk then
 			qk:HookScript("OnShow", function() keybinding = true BarsPeek() end)
 			qk:HookScript("OnHide", function() keybinding = false BarsPeek() end)
+		end
+
+		-- Questie builds its quest tracker a few seconds after login.
+		if Questie and Questie.API and Questie.API.RegisterOnReady then
+			Questie.API.RegisterOnReady(FadeUI.Apply)
 		end
 
 		-- Opening or closing a bag re-checks the bag buttons.
