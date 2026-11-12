@@ -29,7 +29,7 @@ Chat has its own modes instead: **Always**, **When active** (hides after a set n
 
 ## Hide action bars, unit frames, minimap, chat and more
 
-- **Action bars:** Action Bars 1–8, Stance/Form Bar, Pet Bar
+- **Action bars:** Action Bars 1–8, Stance/Form Bar, Totem Bar, Pet Bar
 - **Unit frames:** Player, Pet, Target, Target of Target, Focus, Cast Bar, Swing Timers, Boss Frames
 - **Group frames:** Party Frames, Raid Frames, Raid Manager Tab
 - **Everything else:** Minimap, Buffs, Debuffs, Quest Tracker, Chat, Menu Buttons, Bag Buttons, XP/Rep Bars, Cooldown Manager, Damage Meter

@@ -100,6 +100,8 @@ FadeUI.GROUPS = {
 		{ key = "bar7",   label = "Action Bar 7",       frames = { "MultiBar6" },           default = "never", drag = true },
 		{ key = "bar8",   label = "Action Bar 8",       frames = { "MultiBar7" },           default = "never", drag = true },
 		{ key = "stance", label = "Stance / Form Bar",  frames = { "StanceBar" },           default = "never" },
+		{ key = "totem",  label = "Totem Bar",          frames = { "TotemFrame" },          default = "never",
+		  note = "Only appears while you have a totem out. Sits under the Player Frame, so it is also hidden whenever that is." },
 		{ key = "petbar", label = "Pet Bar",            frames = { "PetActionBar" },        default = "never", drag = true },
 	}},
 	{ title = "Unit frames", items = {
