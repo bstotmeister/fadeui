@@ -175,6 +175,9 @@ local function SetStateDriver(d)
 		OnState(d)
 	elseif d then
 		RegisterStateDriver(stateFrame, "fadeui", d)
+		-- Registering doesn't call back when the state is unchanged (e.g. FadeUI
+		-- turned off and on with a target), so apply it here.
+		OnState(SecureCmdOptionParse(d))
 	else
 		shown = false
 	end
