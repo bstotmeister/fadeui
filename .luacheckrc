@@ -26,6 +26,7 @@ read_globals = {
 	"Chattynator",
 	"time",
 	"Questie",
+	"Details",
 	"C_Timer",
 	"CreateColor",
 	"CreateFrame",
