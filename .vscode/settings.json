@@ -42,6 +42,8 @@
         "HybridMinimap",
         "ERR_SPELL_COOLDOWN",
         "ERR_ABILITY_COOLDOWN",
-        "SPELL_FAILED_NOT_READY"
+        "SPELL_FAILED_NOT_READY",
+        "UnitName",
+        "GetRealmName"
     ]
 }

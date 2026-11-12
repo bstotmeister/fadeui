@@ -541,6 +541,191 @@ local function CustomAddLine(header)
 end
 
 -------------------------------------------------------------------------------
+-- Profiles
+-------------------------------------------------------------------------------
+
+local PROFILE_W, DIALOG_W = 180, 460
+local menu, dialog
+
+-- The list of profiles under the profile button. Clicking one switches to it.
+local function ToggleProfileMenu()
+	if not menu then
+		menu = CreateFrame("Frame", nil, win)
+		menu:SetFrameStrata("FULLSCREEN_DIALOG")
+		menu:SetPoint("TOPLEFT", refs.profile, "BOTTOMLEFT", 0, -2)
+		Fill(menu, "BACKGROUND", CARD)
+		Outline(menu, LINE)
+		menu.items = {}
+		menu:Hide()
+	end
+	if menu:IsShown() then
+		menu:Hide()
+		return
+	end
+	local names, current = FadeUI.GetProfiles(), FadeUI.GetProfile()
+	for i, name in ipairs(names) do
+		local b = menu.items[i]
+		if not b then
+			b = Button(menu, "", PROFILE_W - 2, SEG_H, function(self)
+				menu:Hide()
+				FadeUI.SetProfile(self.profile)
+			end)
+			b:SetPoint("TOPLEFT", 1, -1 - (i - 1) * SEG_H)
+			b.label:SetWidth(PROFILE_W - 14)
+			b.label:SetWordWrap(false)
+			menu.items[i] = b
+		end
+		b.profile = name
+		b.label:SetText(name)
+		SetActive(b, name == current)
+		b:Show()
+	end
+	for i = #names + 1, #menu.items do menu.items[i]:Hide() end
+	menu:SetSize(PROFILE_W, #names * SEG_H + 2)
+	menu:Show()
+end
+
+local function BuildDialog()
+	dialog = CreateFrame("Frame", nil, win)
+	dialog:SetWidth(DIALOG_W)
+	dialog:SetPoint("TOP", 0, -120)
+	dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+	dialog:EnableMouse(true) -- clicks don't go through to the window
+	Fill(dialog, "BACKGROUND", BG, 0.98)
+	Outline(dialog, ACCENT)
+
+	dialog.title = Text(dialog, "GameFontNormal", "", ACCENT)
+	dialog.title:SetPoint("TOPLEFT", PAD, -14)
+	dialog.text = Text(dialog, "GameFontHighlightSmall", "")
+	dialog.text:SetPoint("TOPLEFT", dialog.title, "BOTTOMLEFT", 0, -8)
+	dialog.text:SetWidth(DIALOG_W - 2 * PAD)
+	dialog.text:SetJustifyH("LEFT")
+	dialog.error = Text(dialog, "GameFontHighlightSmall", "")
+	dialog.error:SetTextColor(1, 0.45, 0.45)
+	dialog.error:SetPoint("LEFT", dialog, "BOTTOMLEFT", PAD, 23)
+	dialog.error:SetWidth(DIALOG_W - 2 * PAD - 180)
+	dialog.error:SetJustifyH("LEFT")
+	local function Clear() dialog.error:SetText("") end
+
+	local function OK()
+		local err = dialog.onOK(dialog.name:GetText(), dialog.body:GetText())
+		if err then dialog.error:SetText(err) else dialog:Hide() end
+	end
+	dialog.cancel = Button(dialog, "Cancel", 80, 22, function() dialog:Hide() end)
+	dialog.cancel:SetPoint("BOTTOMRIGHT", -PAD, 12)
+	dialog.ok = Button(dialog, "", 80, 22, OK)
+	dialog.ok:SetPoint("RIGHT", dialog.cancel, "LEFT", -6, 0)
+
+	dialog.name = SearchBox(dialog, 220, SEG_H, "Profile name", Clear)
+	dialog.name:SetMaxLetters(32)
+	dialog.name:SetScript("OnEnterPressed", OK)
+	dialog.name:SetScript("OnEscapePressed", function() dialog:Hide() end)
+
+	-- The big box, for a profile string. It scrolls, since the string is long.
+	local scroll = CreateFrame("ScrollFrame", nil, dialog)
+	scroll:SetSize(DIALOG_W - 2 * PAD, 120)
+	Fill(scroll, "BACKGROUND", BTN)
+	Outline(scroll, LINE)
+	local body = CreateFrame("EditBox", nil, scroll)
+	body:SetMultiLine(true)
+	body:SetAutoFocus(false)
+	body:SetFontObject("GameFontHighlightSmall")
+	body:SetMaxLetters(0)
+	body:SetTextInsets(6, 6, 6, 6)
+	body:SetSize(DIALOG_W - 2 * PAD, 120)
+	scroll:SetScrollChild(body)
+	scroll:EnableMouse(true)
+	scroll:SetScript("OnMouseDown", function() body:SetFocus() end)
+	scroll:EnableMouseWheel(true)
+	scroll:SetScript("OnMouseWheel", function(self, delta)
+		self:SetVerticalScroll(math.max(0, math.min(self:GetVerticalScrollRange(), self:GetVerticalScroll() - delta * 20)))
+	end)
+	body:SetScript("OnEscapePressed", function() dialog:Hide() end)
+	-- An export can't be changed: typing puts it back, selected for copying.
+	body:SetScript("OnTextChanged", function(self, userInput)
+		if not userInput then return end
+		if dialog.fixed then
+			self:SetText(dialog.fixed)
+			self:HighlightText()
+		end
+		Clear()
+	end)
+	body:SetScript("OnEditFocusGained", function(self)
+		if dialog.fixed then self:HighlightText() end
+	end)
+	dialog.scroll, dialog.body = scroll, body
+end
+
+-- Saving, deleting, exporting and importing profiles all use one dialog. `opts`:
+--   title, text   what it's for
+--   name          true for a box to name the profile
+--   body          text for the big box (nil: no box); `fixed` (the same text) can't be changed
+--   ok            the OK button's label (nil: just a Close button)
+--   onOK(name, body)  returns an error message to keep the dialog open
+local function ShowDialog(opts)
+	if not dialog then BuildDialog() end
+	if menu then menu:Hide() end
+	dialog.onOK, dialog.fixed = opts.onOK, opts.fixed
+	dialog.title:SetText(opts.title)
+	dialog.text:SetText(opts.text)
+	dialog.error:SetText("")
+	local below, h = dialog.text, 0
+	dialog.name:SetText("")
+	dialog.name:SetShown(opts.name and true or false)
+	if opts.name then
+		dialog.name:ClearAllPoints()
+		dialog.name:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -10)
+		below, h = dialog.name, h + SEG_H + 10
+	end
+	dialog.body:SetText(opts.body or "")
+	dialog.scroll:SetShown(opts.body ~= nil)
+	if opts.body then
+		dialog.scroll:ClearAllPoints()
+		dialog.scroll:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -10)
+		dialog.scroll:SetVerticalScroll(0)
+		h = h + 130
+	end
+	dialog.ok:SetShown(opts.ok ~= nil)
+	dialog.ok.label:SetText(opts.ok or "")
+	dialog.cancel.label:SetText(opts.ok and "Cancel" or "Close")
+	dialog:SetHeight(36 + dialog.text:GetStringHeight() + h + 56)
+	dialog:Show()
+	if opts.body then
+		dialog.body:SetFocus()
+	elseif opts.name then
+		dialog.name:SetFocus()
+	end
+end
+
+local function SaveAsDialog()
+	ShowDialog({ title = "Save as a new profile",
+		text = "Saves a copy of " .. FadeUI.GetProfile() .. " under a new name, and switches this character to it.",
+		name = true, ok = "Save", onOK = FadeUI.NewProfile })
+end
+
+local function DeleteDialog()
+	local name = FadeUI.GetProfile()
+	if name == FadeUI.DEFAULT_PROFILE then return end
+	ShowDialog({ title = "Delete " .. name .. "?",
+		text = "This character switches to " .. FadeUI.DEFAULT_PROFILE .. ". So does any other character using "
+			.. name .. ", the next time it logs in.",
+		ok = "Delete", onOK = FadeUI.DeleteProfile })
+end
+
+local function ExportDialog()
+	local s = FadeUI.ExportProfile()
+	ShowDialog({ title = "Export " .. FadeUI.GetProfile(),
+		text = "Press Ctrl+C to copy this, then share it. Anyone with FadeUI can paste it into Import to get the same settings (all but the on/off switch).",
+		body = s, fixed = s })
+end
+
+local function ImportDialog()
+	ShowDialog({ title = "Import a profile",
+		text = "Paste a profile string below (Ctrl+V) and give the new profile a name. This character switches to it.",
+		name = true, body = "", ok = "Import", onOK = FadeUI.ImportProfile })
+end
+
+-------------------------------------------------------------------------------
 -- Window
 -------------------------------------------------------------------------------
 
@@ -569,6 +754,10 @@ local function Build()
 		-- A custom frame that wasn't there may be now.
 		if FadeUI.CustomMissing() then FadeUI.Apply() end
 		FadeUI.RefreshOptions()
+	end)
+	win:SetScript("OnHide", function()
+		if menu then menu:Hide() end
+		if dialog then dialog:Hide() end
 	end)
 	Fill(win, "BACKGROUND", BG, 0.97)
 	Outline(win, LINE)
@@ -625,14 +814,40 @@ local function Build()
 		anchor = label
 	end
 
-	-- Account-wide or per-character settings
+	-- Profile: the settings this character uses, and saving, deleting and sharing them
 	y = y - 26
-	refs.perChar = Checkbox(win, "Use settings for this character only", function(self)
-		FadeUI.SetPerCharacter(self:GetChecked())
-	end)
-	refs.perChar:SetPoint("TOPLEFT", PAD, y)
-	Tooltip(refs.perChar, "Settings for this character only",
-		"Off: this character uses your account-wide settings, shared with every character that has this off.\n\nOn: this character keeps its own settings, starting as a copy of the account-wide ones. Changes then only affect this character.")
+	local profileLabel = Text(win, "GameFontHighlight", "Profile:")
+	profileLabel:SetPoint("TOPLEFT", PAD, y - 3)
+	refs.profile = Button(win, "", PROFILE_W, SEG_H, ToggleProfileMenu)
+	refs.profile:SetPoint("LEFT", profileLabel, "RIGHT", 8, 0)
+	refs.profile.label:ClearAllPoints()
+	refs.profile.label:SetPoint("LEFT", 8, 0)
+	refs.profile.label:SetPoint("RIGHT", -22, 0)
+	refs.profile.label:SetJustifyH("LEFT")
+	refs.profile.label:SetWordWrap(false)
+	local arrow = refs.profile:CreateTexture(nil, "ARTWORK")
+	arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
+	arrow:SetSize(14, 14)
+	arrow:SetPoint("RIGHT", -4, -3)
+	Tooltip(refs.profile, "Profile",
+		"The settings this character uses. Click to switch to another.\n\nProfiles are shared by all your characters, and each character remembers which one it's on. Changes go straight into the profile in use, so they affect every character on it.")
+	local prev = refs.profile
+	for _, info in ipairs({
+		{ "profileSave", "Save as", SaveAsDialog, "Save as a new profile",
+		  "Saves a copy of this profile under a new name and switches to it, so you can change it without touching this one." },
+		{ "profileDelete", "Delete", DeleteDialog, "Delete this profile",
+		  "Deletes the profile this character uses, and switches to " .. FadeUI.DEFAULT_PROFILE .. ". " .. FadeUI.DEFAULT_PROFILE .. " itself can't be deleted." },
+		{ "profileExport", "Export", ExportDialog, "Export",
+		  "Shows this profile as a line of text you can copy and share." },
+		{ "profileImport", "Import", ImportDialog, "Import",
+		  "Makes a new profile from a line of text someone exported." },
+	}) do
+		local b = Button(win, info[2], 64, SEG_H, info[3])
+		b:SetPoint("LEFT", prev, "RIGHT", prev == refs.profile and 8 or SEG_GAP, 0)
+		Tooltip(b, info[4], info[5])
+		refs[info[1]] = b
+		prev = b
+	end
 
 	-- Range, resource and cooldown helpers: they share one icon, and each has its own time
 	y = y - 26
@@ -800,6 +1015,18 @@ local function Build()
 		FadeUI.ResetDefaults()
 	end)
 	reset:SetPoint("LEFT", PAD - 1, 0)
+	Tooltip(reset, "Reset to defaults", function()
+		return "Puts every setting in the profile " .. FadeUI.GetProfile() .. " back to its default. Your other profiles aren't changed."
+	end)
+	-- Undo and redo: back and forth through this session's changes to the profile
+	refs.undo = Button(foot, "Undo", 60, 22, function() FadeUI.Undo() end)
+	refs.undo:SetPoint("LEFT", reset, "RIGHT", 6, 0)
+	refs.redo = Button(foot, "Redo", 60, 22, function() FadeUI.Redo() end)
+	refs.redo:SetPoint("LEFT", refs.undo, "RIGHT", SEG_GAP, 0)
+	Tooltip(refs.undo, "Undo",
+		"Puts this profile back the way it was before your last change, one change at a time, as far back as when you logged in or reloaded. The on/off switch isn't included.")
+	Tooltip(refs.redo, "Redo",
+		"Makes the change you last undid again. Making a new change instead clears what you can redo.")
 	refs.keyHint = Text(foot, "GameFontHighlightSmall", "", MUTED)
 	refs.keyHint:SetPoint("RIGHT", -PAD, 0)
 
@@ -818,7 +1045,16 @@ function FadeUI.RefreshOptions()
 	if not db then return end
 
 	refs.master:SetChecked(db.enabled)
-	refs.perChar:SetChecked(FadeUI.IsPerCharacter())
+	local profile = FadeUI.GetProfile()
+	local isDefault = profile == FadeUI.DEFAULT_PROFILE
+	refs.profile.label:SetText(profile)
+	refs.profileDelete:SetEnabled(not isDefault)
+	refs.profileDelete:SetAlpha(isDefault and 0.45 or 1)
+	local undo, redo = FadeUI.HistorySize()
+	refs.undo:SetEnabled(undo > 0)
+	refs.undo:SetAlpha(undo > 0 and 1 or 0.45)
+	refs.redo:SetEnabled(redo > 0)
+	refs.redo:SetAlpha(redo > 0 and 1 or 0.45)
 	for _, e in ipairs(refs.fade) do
 		if not e:HasFocus() then e:SetText(("%g"):format((db[e.field] or 0) / 10)) end
 	end

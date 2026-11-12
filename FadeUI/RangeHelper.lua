@@ -234,6 +234,7 @@ f:SetScript("OnDragStop", function(self)
 	local db = FadeUI.GetDB()
 	local point, _, relPoint, x, y = self:GetPoint()
 	db.rangePoint, db.rangeRelPoint, db.rangeX, db.rangeY = point, relPoint, x, y
+	FadeUI.Changed() -- so the move can be undone
 end)
 f:SetScript("OnEnter", function(self)
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")

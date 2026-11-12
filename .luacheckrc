@@ -65,4 +65,6 @@ read_globals = {
 	"hooksecurefunc",
 	"strtrim",
 	"tinsert",
+	"UnitName",
+	"GetRealmName",
 }
