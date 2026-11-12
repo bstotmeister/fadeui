@@ -1,0 +1,5 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<!-- One file per addon FadeUI supports (see Addons.lua). -->
+	<Script file="Questie.lua"/>
+	<Script file="Chattynator.lua"/>
+</Ui>

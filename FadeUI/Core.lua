@@ -126,11 +126,7 @@ FadeUI.GROUPS = {
 		{ key = "minimap", label = "Minimap",           frames = { "MinimapCluster" },      default = "target" },
 		{ key = "buffs",   label = "Buffs",             frames = { "BuffFrame" },           default = "target" },
 		{ key = "debuffs", label = "Debuffs",           frames = { "DebuffFrame" },         default = "combat" },
-		-- Questie hides Blizzard's tracker and shows its own (Questie_BaseFrame), which
-		-- isn't managed, so it goes in a holder and fades. Its quest item buttons make
-		-- it protected on and off, so its holder is always secure.
-		{ key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame", "Questie_BaseFrame" }, default = "target",
-		  direct = { ObjectiveTrackerFrame = true }, secure = { Questie_BaseFrame = true } },
+		{ key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "target", direct = true },
 		{ key = "chat",    label = "Chat",              frames = CHAT_FRAMES,               default = "active", modes = FadeUI.CHAT_MODES,
 		  note = "Chat always comes back while you are typing a message." },
 		{ key = "micro",   label = "Menu Buttons",      frames = { "MicroMenuContainer" },  default = "never" },
@@ -141,16 +137,61 @@ FadeUI.GROUPS = {
 	}},
 }
 
+-- How each frame is hidden, by name. Without one, a frame is moved into a holder
+-- (see Attach), which is secure if the frame is protected.
+--   "direct"  - stays where it is and is hidden itself, with no fade (AttachDirect).
+--               An element's `direct = true` sets this for all its frames.
+--   "inPlace" - stays where it is and is its own holder (AttachInPlace)
+--   "secure"  - moved into a holder that's always secure, for a frame that's
+--               only protected some of the time
+local FRAME_STYLE = {}
+
 local ELEMENTS, BY_KEY = {}, {}
+FadeUI.ELEMENTS, FadeUI.BY_KEY, FadeUI.FRAME_STYLE = ELEMENTS, BY_KEY, FRAME_STYLE
+
+local function Register(el, group)
+	el.modes = el.modes or FadeUI.MODES
+	el.bar = group.bars -- shown in Quick Keybind Mode (see BarsPeek)
+	el.group = group
+	if el.direct then
+		for _, name in ipairs(el.frames) do FRAME_STYLE[name] = "direct" end
+	end
+	ELEMENTS[#ELEMENTS + 1] = el
+	BY_KEY[el.key] = el
+end
+
 for _, group in ipairs(FadeUI.GROUPS) do
-	for _, el in ipairs(group.items) do
-		el.modes = el.modes or FadeUI.MODES
-		el.bar = group.bars -- shown in Quick Keybind Mode (see BarsPeek)
-		ELEMENTS[#ELEMENTS + 1] = el
-		BY_KEY[el.key] = el
+	for _, el in ipairs(group.items) do Register(el, group) end
+end
+
+-- The group with this title, added after the others if it's new.
+function FadeUI.GetGroup(title)
+	for _, group in ipairs(FadeUI.GROUPS) do
+		if group.title == title then return group end
+	end
+	local group = { title = title, items = {} }
+	FadeUI.GROUPS[#FadeUI.GROUPS + 1] = group
+	return group
+end
+
+-- Elements from other addons (Addons.lua) and custom frames (Custom.lua). An
+-- element added before settings load (ADDON_LOADED) gets its default mode.
+function FadeUI.AddElement(el, title)
+	local group = FadeUI.GetGroup(title)
+	group.items[#group.items + 1] = el
+	Register(el, group)
+end
+
+function FadeUI.RemoveElement(key)
+	local el = BY_KEY[key]
+	if not el then return end
+	BY_KEY[key] = nil
+	for _, list in ipairs({ ELEMENTS, el.group.items }) do
+		for i = #list, 1, -1 do
+			if list[i] == el then table.remove(list, i) end
+		end
 	end
 end
-FadeUI.ELEMENTS, FadeUI.BY_KEY = ELEMENTS, BY_KEY
 
 -------------------------------------------------------------------------------
 -- Settings
@@ -185,8 +226,11 @@ local function Defaults(target)
 	target.minimapShownSize = 100  -- the map's size while shown, % of the minimap
 	target.minimapHiddenSize = 65  -- ...and while hidden
 	target.minimapPing = true      -- clicking Nodes or Map pings, like the normal minimap (off: clicks go through)
+	target.custom = {}             -- names of the custom frames (Custom.lua); their modes are in `modes`
 	target.modes = {}
-	for _, el in ipairs(ELEMENTS) do target.modes[el.key] = el.default end
+	for _, el in ipairs(ELEMENTS) do
+		if not el.custom then target.modes[el.key] = el.default end
+	end
 end
 
 local function FillMissing(t)
@@ -207,6 +251,8 @@ local function CopySettings(from, to)
 	for k in pairs(d) do to[k] = from[k] end
 	to.modes = {}
 	for key, mode in pairs(from.modes or {}) do to.modes[key] = mode end
+	to.custom = {}
+	for i, name in ipairs(from.custom or {}) do to.custom[i] = name end
 end
 
 -- Picks the account-wide or this character's settings. A character's own
@@ -217,6 +263,7 @@ local function UseSettings()
 	end
 	db = FadeUIDB.perCharacter and FadeUIDB or FadeUIAccountDB
 	FillMissing(db)
+	FadeUI.RebuildCustom()
 end
 
 function FadeUI.GetDB() return db end
@@ -565,19 +612,6 @@ local function GetFrame(name)
 	end
 end
 
--- Chattynator replaces Blizzard's chat with its own windows, all inside
--- ChattynatorHyperlinkHandler, and borrows Blizzard's typing box. It hides the
--- Blizzard chat windows itself, but only if they're still directly on UIParent,
--- so with it loaded FadeUI leaves them alone and fades Chattynator instead.
-local CHATTYNATOR_FRAMES = { "ChattynatorHyperlinkHandler", "ChatFrame1EditBox" }
--- Chattynator goes by that frame's parent too (it opens its copy-chat window
--- there), so it stays where it is and is its own holder (see AttachInPlace).
-local IN_PLACE = { ChattynatorHyperlinkHandler = true }
-
-local function UsingChattynator()
-	return GetFrame("ChattynatorHyperlinkHandler") ~= nil
-end
-
 -- Re-checks an element that can show outside its mode: chat comes back while
 -- you type, so you can see what you're writing, and hides once it has been idle
 -- (see ChatState); bag buttons show while your bags are open; action bars show
@@ -601,24 +635,6 @@ end
 -- haven't typed, for db.chatIdle.
 local chatLastActive, chatTimer = 0, nil
 
--- Chattynator draws its own windows, so a filter on each of its tabs counts its
--- messages instead. Chattynator runs it on each message the tab shows as it
--- arrives, even one whose text is secret (in boss fights, Mythic+ and PvP), and
--- again on older ones it redraws, so only recent messages count. Tabs added
--- since are watched once chat next goes idle.
-local function ChattynatorActivity(data)
-	if type(data.timestamp) == "number" and time() - data.timestamp <= 2 then FadeUI.ChatActivity() end
-	return true -- the tab still shows it
-end
-
-local function WatchChattynator()
-	local api = UsingChattynator() and Chattynator and Chattynator.API
-	if not (api and api.AddFilter and api.GetWindowsAndTabs) then return end
-	for window, tabs in ipairs(api.GetWindowsAndTabs()) do
-		for tab in ipairs(tabs) do api.AddFilter(ChattynatorActivity, window, tab) end
-	end
-end
-
 local function ChatIdleCheck()
 	if chatTimer then
 		chatTimer:Cancel()
@@ -631,7 +647,7 @@ local function ChatIdleCheck()
 	if idle ~= chatIdle then
 		chatIdle = idle
 		FadeUI.UpdatePeek("chat")
-		if idle then WatchChattynator() end
+		if idle then FadeUI.FireAddons("OnChatIdle") end
 	end
 end
 
@@ -710,9 +726,8 @@ function FadeUI.Apply()
 	end
 	FadeUI.pendingApply = false
 
-	BY_KEY.chat.frames = UsingChattynator() and CHATTYNATOR_FRAMES or CHAT_FRAMES
-
 	local active = FadeUI.IsActive()
+	local seen = {} -- frame -> true once an element has it
 	for _, el in ipairs(ELEMENTS) do
 		el.found = 0
 		local mode = el.modes.byKey[db.modes[el.key]] or el.modes.byKey.always
@@ -723,21 +738,34 @@ function FadeUI.Apply()
 			local f = GetFrame(name)
 			if f then
 				el.found = el.found + 1
-				if active then
-					-- `direct` and `secure` are true for every frame, or a set of names.
-					local direct = el.direct == true or (el.direct and el.direct[name])
-					local h = direct and AttachDirect(f) or IN_PLACE[name] and AttachInPlace(f) or Attach(f, el.secure and el.secure[name])
-					h.fadeuiChat = el.key == "chat"
-					h.fadeuiBags = el.key == "bags"
-					h.fadeuiDrag = el.drag
-					h.fadeuiBar = el.bar
-					SetDriver(h, driver)
-				else
-					Detach(f)
+				-- A frame in two elements (a custom frame FadeUI now supports
+				-- itself) goes by the first; custom frames come last.
+				if not seen[f] then
+					seen[f] = true
+					if active then
+						local style = FRAME_STYLE[name]
+						local h = style == "direct" and AttachDirect(f) or style == "inPlace" and AttachInPlace(f)
+							or Attach(f, style == "secure")
+						h.fadeuiChat = el.key == "chat"
+						h.fadeuiBags = el.key == "bags"
+						h.fadeuiDrag = el.drag
+						h.fadeuiBar = el.bar
+						SetDriver(h, driver)
+					else
+						Detach(f)
+					end
 				end
 			end
 		end
 	end
+
+	-- A frame no element has any more (a custom frame that was removed, chat
+	-- windows another addon took over) goes back to normal.
+	local released = {}
+	for f in pairs(attached) do
+		if not seen[f] then released[#released + 1] = f end
+	end
+	for _, f in ipairs(released) do Detach(f) end
 
 	ChatIdleCheck()
 	-- Re-check every element: re-registering a state driver doesn't fire it when
@@ -853,6 +881,7 @@ end
 
 function FadeUI.ResetDefaults()
 	Defaults(db)
+	FadeUI.RebuildCustom()
 	FadeUI.Changed()
 end
 
@@ -908,13 +937,18 @@ events:SetScript("OnEvent", function(_, event, arg1)
 			FadeUIDB.watch = nil -- the range helper's old spell slot (never released)
 			UseSettings()
 		elseif loggedIn then
-			-- A Blizzard module loaded late may have created one of our frames.
+			-- A Blizzard module or addon loaded late may have created one of our
+			-- frames, or be one FadeUI supports (Addons.lua).
+			FadeUI.ActivateAddons()
 			FadeUI.Apply()
 		end
 
 	elseif event == "PLAYER_LOGIN" then
 		loggedIn = true
 		chatLastActive = GetTime()
+		-- Before anything is hidden, so frames another addon takes over (Blizzard
+		-- chat, with Chattynator) are never touched.
+		FadeUI.ActivateAddons()
 		FadeUI.Apply()
 		if firstRun then
 			Print("is %s. Type |cffffff00/fui|r to choose what shows and when. Bind a toggle key under Key Bindings > AddOns.",
@@ -956,21 +990,12 @@ events:SetScript("OnEvent", function(_, event, arg1)
 			end
 		end
 
-		-- Chattynator doesn't send messages to the Blizzard chat windows, so its
-		-- own count instead (see WatchChattynator).
-		WatchChattynator()
-
 		-- Quick Keybind Mode (from Settings or Edit Mode) shows every action bar,
 		-- so you can hover the buttons to bind them.
 		local qk = GetFrame("QuickKeybindFrame")
 		if qk then
 			qk:HookScript("OnShow", function() keybinding = true BarsPeek() end)
 			qk:HookScript("OnHide", function() keybinding = false BarsPeek() end)
-		end
-
-		-- Questie builds its quest tracker a few seconds after login.
-		if Questie and Questie.API and Questie.API.RegisterOnReady then
-			Questie.API.RegisterOnReady(FadeUI.Apply)
 		end
 
 		-- Opening or closing a bag re-checks the bag buttons.

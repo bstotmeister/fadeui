@@ -13,6 +13,7 @@ Built for **WoW Forever**. It's like pressing Alt-Z, but automatic and element b
 - **Play with hidden action bars:** spell helpers show when a spell is out of range, on cooldown or short on mana, and keybinds keep working.
 - **A minimap that stays out of the way:** keep just the herb and ore nodes, or a borderless circular map.
 - **Safe in combat:** built on secure state drivers, so there are no taint errors and no blocked actions.
+- **Other addons too:** Questie and Chattynator work out of the box, and you can add any other addon's frame yourself.
 - **Plays nice with Blizzard's UI:** Edit Mode, the Cooldown Manager and the Damage Meter all work, and one toggle puts everything back.
 
 ## Show UI in combat, hide it out of combat
@@ -35,6 +36,15 @@ Chat has its own modes instead: **Always**, **When active** (hides after a set n
 - **Everything else:** Minimap, Buffs, Debuffs, Quest Tracker, Chat, Menu Buttons, Bag Buttons, XP/Rep Bars, Cooldown Manager, Damage Meter
 
 Bag buttons can also show whenever your bags are open, and action bars show while you drag a spell or item onto them or use Quick Keybind Mode.
+
+## Works with other addons
+
+- **Questie:** its quest tracker follows the Quest Tracker setting.
+- **Chattynator:** the Chat setting fades Chattynator's windows instead of Blizzard's.
+
+## Custom frames: hide any addon's UI
+
+Is there something FadeUI doesn't have a setting for, such as another addon's window? Add it under **Custom frames** in the options window. Type the frame's name (`/fstack` shows it when you hover the frame), or click **Pick**, hover the frame and press Enter. It gets its own row with the same five modes, and removing it puts it straight back to normal.
 
 ## Minimal minimap: just the nodes, or a clean circle
 

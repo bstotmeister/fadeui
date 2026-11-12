@@ -24,6 +24,10 @@ scripts/link.sh _retail_       # or any other flavor folder
 
 Set `WOW_DIR` if WoW isn't installed at `/Applications/World of Warcraft`.
 
+To support another addon, add a file for it to `FadeUI/Addons/` and list it in
+`FadeUI/Addons/Addons.xml`. `FadeUI/Addons.lua` describes what a file can declare, and
+`Addons/Questie.lua` and `Addons/Chattynator.lua` are examples.
+
 ## Contributing
 
 Report bugs and request features with the [issue forms](https://github.com/bstotmeister/fadeui/issues/new/choose).
