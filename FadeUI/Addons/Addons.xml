@@ -2,4 +2,5 @@
 	<!-- One file per addon FadeUI supports (see Addons.lua). -->
 	<Script file="Questie.lua"/>
 	<Script file="Chattynator.lua"/>
+	<Script file="Details.lua"/>
 </Ui>
