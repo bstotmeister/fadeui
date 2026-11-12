@@ -100,7 +100,7 @@ FadeUI.GROUPS = {
 		{ key = "bar7",   label = "Action Bar 7",       frames = { "MultiBar6" },           default = "never", drag = true },
 		{ key = "bar8",   label = "Action Bar 8",       frames = { "MultiBar7" },           default = "never", drag = true },
 		{ key = "stance", label = "Stance / Form Bar",  frames = { "StanceBar" },           default = "never" },
-		{ key = "totembar", label = "Totem Bar",        frames = { "MultiCastActionBarFrame" }, default = "never", drag = true },
+		{ key = "totembar", label = "Totem Bar",        frames = { "MultiCastActionBarFrame" }, default = "combat", drag = true },
 		{ key = "petbar", label = "Pet Bar",            frames = { "PetActionBar" },        default = "never", drag = true },
 	}},
 	{ title = "Unit frames", items = {
