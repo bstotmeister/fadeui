@@ -526,6 +526,16 @@ local function AttachInPlace(frame)
 	return frame
 end
 
+-- Whether a frame would be on screen if FadeUI weren't hiding it: it and
+-- everything it's in are shown, up to its holder.
+local function ShownApartFromFadeUI(frame)
+	while frame and not (frame.fadeuiFrame and holders[frame.fadeuiFrame] == frame) do
+		if not frame:IsShown() then return false end
+		frame = frame:GetParent()
+	end
+	return true
+end
+
 local function Detach(frame)
 	local h = holders[frame]
 	attached[frame] = nil
@@ -881,11 +891,13 @@ events:SetScript("OnEvent", function(_, event, arg1)
 				box:HookScript("OnEditFocusLost", StopTyping)
 			end
 			-- New lines in a chat window you can see (the selected tab, or an
-			-- undocked window) count as chat activity.
+			-- undocked window) count as chat activity. Chattynator keeps these
+			-- windows shown but inside hidden frames, and shows the combat log in
+			-- one of its tabs, so everything the window is in has to be shown too.
 			local f = GetFrame("ChatFrame" .. i)
 			if f and f.AddMessage then
 				hooksecurefunc(f, "AddMessage", function(self)
-					if self:IsShown() then FadeUI.ChatActivity() end
+					if ShownApartFromFadeUI(self) then FadeUI.ChatActivity() end
 				end)
 			end
 		end
