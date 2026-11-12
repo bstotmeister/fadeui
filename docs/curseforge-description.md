@@ -71,6 +71,7 @@ The icon flashes when the spell is ready, and hides when you cast it or after a 
 ## More features
 
 - **Smooth fading:** set the fade-in time, the fade-out time, and a delay before fading out (for example, right after combat ends). In combat, elements always hide instantly.
+- **Hover to show:** for each element, keep it up while the mouse is over it, or show it whenever you hover its spot.
 - **One-click setup:** click a column header in the options window to set every element to that mode.
 - **Search:** type in the options window to find an element quickly.
 - **Edit Mode friendly:** everything is shown while Edit Mode is open, so you can still move your frames.
