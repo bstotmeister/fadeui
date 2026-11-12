@@ -535,8 +535,9 @@ end
 -- Re-checks an element that can show outside its mode: chat comes back while
 -- you type, so you can see what you're writing, and hides once it has been idle
 -- (see ChatState); bag buttons show while your bags are open; action bars show
--- while you drag something onto them.
-function FadeUI.UpdatePeek(key)
+-- while you drag something onto them. It hides right away, unless `wait`: then
+-- the fade-out delay applies first, as it does when the mode hides it.
+function FadeUI.UpdatePeek(key, wait)
 	local el = BY_KEY[key]
 	if not el or not db or not loggedIn then return end
 	for _, name in ipairs(el.frames) do
@@ -545,7 +546,7 @@ function FadeUI.UpdatePeek(key)
 		if h and attached[f] and h.fadeuiDriver and not (InCombatLockdown() and h:IsProtected()) then
 			local state = h.fadeuiDriver
 			if state ~= "show" and state ~= "hide" then state = SecureCmdOptionParse(state) end
-			Holder_State(h, state, true)
+			Holder_State(h, state, not wait)
 		end
 	end
 end
@@ -907,8 +908,9 @@ events:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if FadeUI.pendingApply then FadeUI.Apply() end
 		-- A hide that came during combat (a drag or bags closed in combat, a fade
-		-- cut off by combat) couldn't happen then: re-check everything.
-		for _, el in ipairs(ELEMENTS) do FadeUI.UpdatePeek(el.key) end
+		-- cut off by combat) couldn't happen then: re-check everything. Each waits
+		-- out the fade-out delay, like the rest of the UI as combat ends.
+		for _, el in ipairs(ELEMENTS) do FadeUI.UpdatePeek(el.key, true) end
 		if pendingMacroCleanup then RemoveOldMacros() end
 		if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 	end
