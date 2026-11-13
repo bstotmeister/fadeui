@@ -91,15 +91,15 @@ end
 
 FadeUI.GROUPS = {
 	{ title = "Action bars", bars = true, items = {
-		{ key = "bar1",   label = "Action Bar 1",       frames = { "MainActionBar", "MainMenuBar" }, default = "never", drag = true },
-		{ key = "bar2",   label = "Action Bar 2",       frames = { "MultiBarBottomLeft" },  default = "never", drag = true },
-		{ key = "bar3",   label = "Action Bar 3",       frames = { "MultiBarBottomRight" }, default = "never", drag = true },
-		{ key = "bar4",   label = "Action Bar 4",       frames = { "MultiBarRight" },       default = "never", drag = true },
-		{ key = "bar5",   label = "Action Bar 5",       frames = { "MultiBarLeft" },        default = "never", drag = true },
+		{ key = "bar1",   label = "Action Bar 1",       frames = { "MainActionBar", "MainMenuBar" }, default = "combat", drag = true },
+		{ key = "bar2",   label = "Action Bar 2",       frames = { "MultiBarBottomLeft" },  default = "combat", drag = true },
+		{ key = "bar3",   label = "Action Bar 3",       frames = { "MultiBarBottomRight" }, default = "combat", drag = true },
+		{ key = "bar4",   label = "Action Bar 4",       frames = { "MultiBarRight" },       default = "combat", drag = true },
+		{ key = "bar5",   label = "Action Bar 5",       frames = { "MultiBarLeft" },        default = "combat", drag = true },
 		{ key = "bar6",   label = "Action Bar 6",       frames = { "MultiBar5" },           default = "never", drag = true },
 		{ key = "bar7",   label = "Action Bar 7",       frames = { "MultiBar6" },           default = "never", drag = true },
 		{ key = "bar8",   label = "Action Bar 8",       frames = { "MultiBar7" },           default = "never", drag = true },
-		{ key = "stance", label = "Stance / Form Bar",  frames = { "StanceBar" },           default = "never" },
+		{ key = "stance", label = "Stance / Form Bar",  frames = { "StanceBar" },           default = "combat" },
 		{ key = "totembar", label = "Totem Bar",        frames = { "MultiCastActionBarFrame" }, default = "combat", drag = true },
 		{ key = "petbar", label = "Pet Bar",            frames = { "PetActionBar" },        default = "never", drag = true },
 	}},
@@ -123,7 +123,7 @@ FadeUI.GROUPS = {
 		{ key = "raidmgr", label = "Raid Manager Tab",  frames = { "CompactRaidFrameManager" },   default = "never" },
 	}},
 	{ title = "Everything else", items = {
-		{ key = "minimap", label = "Minimap",           frames = { "MinimapCluster" },      default = "target" },
+		{ key = "minimap", label = "Minimap",           frames = { "MinimapCluster" },      default = "never" },
 		{ key = "buffs",   label = "Buffs",             frames = { "BuffFrame" },           default = "target" },
 		{ key = "debuffs", label = "Debuffs",           frames = { "DebuffFrame" },         default = "combat" },
 		{ key = "tracker", label = "Quest Tracker",     frames = { "ObjectiveTrackerFrame" }, default = "target", direct = true },
@@ -132,8 +132,8 @@ FadeUI.GROUPS = {
 		{ key = "micro",   label = "Menu Buttons",      frames = { "MicroMenuContainer" },  default = "never" },
 		{ key = "bags",    label = "Bag Buttons",       frames = { "BagsBar" },             default = "never" },
 		{ key = "xp",      label = "XP / Rep Bars",     frames = { "MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer" }, default = "never" },
-		{ key = "cdm",     label = "Cooldown Manager",  frames = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }, default = "never", direct = true },
-		{ key = "meter",   label = "Damage Meter",      frames = { "DamageMeter" },         default = "never" },
+		{ key = "cdm",     label = "Cooldown Manager",  frames = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }, default = "combat", direct = true },
+		{ key = "meter",   label = "Damage Meter",      frames = { "DamageMeter" },         default = "combat" },
 	}},
 }
 
@@ -221,16 +221,18 @@ local function Defaults(target)
 	target.resourceHelper = true -- ...or short on mana/rage/energy
 	target.cooldownHelper = true -- ...or on cooldown (and shows the cooldown on the icon)
 	target.rangeTime = 80    -- the icon stays up this long after a range failure or target change, tenths of a second (0 = until cast)
-	target.resourceTime = 80 -- the same, after a resource failure
-	target.cooldownTime = 80 -- the same, after a cooldown failure
+	target.resourceTime = 5  -- the same, after a resource failure
+	target.cooldownTime = 50 -- the same, after a cooldown failure
 	target.cooldownBuffer = 20 -- a spell failing on cooldown this soon after you cast it is ignored, tenths of a second (0 = off)
 	target.rangePoint, target.rangeRelPoint, target.rangeX, target.rangeY = "CENTER", "CENTER", 0, -120
-	target.minimapShown = "normal" -- minimap style while shown: "normal" or "map" (Minimap.lua)
+	target.minimapShown = "map"    -- minimap style while shown: "normal" or "map" (Minimap.lua)
 	target.minimapHidden = "map"   -- ...and while hidden: "none", "nodes" or "map"
-	target.minimapShownSize = 100  -- the map's size while shown, % of the minimap
+	target.minimapShownSize = 85   -- the map's size while shown, % of the minimap
 	target.minimapHiddenSize = 65  -- ...and while hidden
 	target.minimapPing = true      -- clicking Nodes or Map pings, like the normal minimap (off: clicks go through)
 	target.custom = {}             -- names of the custom frames (Custom.lua); their modes are in `modes`
+	target.hoverKeep = { bar1 = true }  -- element key -> true: stays shown while the mouse is over it (see HoverCheck)
+	target.hoverShow = { meter = true } -- element key -> true: shows whenever the mouse is over it
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do
 		if not el.custom then target.modes[el.key] = el.default end
@@ -257,6 +259,10 @@ local function CopySettings(from, to)
 	for key, mode in pairs(from.modes or {}) do to.modes[key] = mode end
 	to.custom = {}
 	for i, name in ipairs(from.custom or {}) do to.custom[i] = name end
+	for _, field in ipairs({ "hoverKeep", "hoverShow" }) do
+		to[field] = {}
+		for key, on in pairs(from[field] or {}) do to[field][key] = on end
+	end
 end
 
 -- Removes the settings from a table, leaving anything else in it.
@@ -600,6 +606,15 @@ local bagsOpen = false
 local dragging = false
 local keybinding = false
 
+-- An element with Stay (db.hoverKeep) stays shown while the mouse is over it,
+-- and one with Show (db.hoverShow) shows whenever it is (see HoverCheck).
+local hovered = {} -- element key -> true while the mouse is over it
+
+-- Whether hover holds an element shown. `isShown` is whether it's shown now.
+function FadeUI.HoverHolds(key, isShown)
+	return hovered[key] and db and (db.hoverShow[key] or db.hoverKeep[key] and isShown) and true or false
+end
+
 -- The holder's state driver changed to "show" or "hide". Secure holders run
 -- STATE_SNIPPET first, which has already shown them (or hidden them in combat).
 -- `now` skips the fade-out delay.
@@ -608,6 +623,8 @@ local function Holder_State(h, state, now)
 	if h.fadeuiBags and bagsOpen and db.bagsOpen then state = "show" end
 	if h.fadeuiDrag and dragging and db.barsDrag then state = "show" end
 	if h.fadeuiBar and keybinding then state = "show" end
+	if h.fadeuiKey and FadeUI.HoverHolds(h.fadeuiKey, h:IsShown())
+		and not (InCombatLockdown() and h:IsProtected()) then state = "show" end
 	if h.fadeuiTimer then
 		h.fadeuiTimer:Cancel()
 		h.fadeuiTimer = nil
@@ -952,6 +969,68 @@ local function BarsPeek()
 	end
 end
 
+-- Hover is checked by position, a few times a second, so nothing takes the
+-- mouse: a hidden element's spot doesn't block clicks or mouse-over. It goes by
+-- the element's own frames, not their holders, which mostly cover the screen.
+local hoverTicker
+
+local function MouseOverFrame(f)
+	local l, b, w, ht = f:GetRect()
+	if not l then return false end
+	local x, y = GetCursorPosition()
+	local s = f:GetEffectiveScale()
+	x, y = x / s, y / s
+	return x >= l and x <= l + w and y >= b and y <= b + ht
+end
+
+-- Whether the mouse is over one of an element's frames that would be on screen
+-- if FadeUI weren't hiding it (so not an empty pet frame or a closed chat window).
+local function MouseOverElement(el)
+	for _, name in ipairs(el.frames) do
+		local f = GetFrame(name)
+		local h = f and holders[f]
+		if h and attached[f] then
+			local onScreen
+			if h.fadeuiDirect then onScreen = wanted[f] else onScreen = ShownApartFromFadeUI(f) end
+			if onScreen and MouseOverFrame(f) then return true end
+		end
+	end
+	return false
+end
+
+-- Moving onto an element re-checks it; moving off waits the fade-out delay.
+local function HoverCheck()
+	for _, el in ipairs(ELEMENTS) do
+		local key = el.key
+		local over = (db.hoverKeep[key] or db.hoverShow[key]) and MouseOverElement(el) or nil
+		if over ~= hovered[key] then
+			hovered[key] = over
+			FadeUI.UpdatePeek(key, true)
+			if key == "minimap" and FadeUI.RecheckMinimapHover then FadeUI.RecheckMinimapHover() end
+		end
+	end
+end
+
+-- Hover is checked while FadeUI is on and any element has Stay or Show on.
+local function UpdateHoverTicker(active)
+	local want = false
+	if active then
+		for _, el in ipairs(ELEMENTS) do
+			if db.hoverKeep[el.key] or db.hoverShow[el.key] then
+				want = true
+				break
+			end
+		end
+	end
+	if want and not hoverTicker then
+		hoverTicker = C_Timer.NewTicker(0.1, HoverCheck)
+	elseif not want and hoverTicker then
+		hoverTicker:Cancel()
+		hoverTicker = nil
+	end
+	if not want then hovered = {} end
+end
+
 -------------------------------------------------------------------------------
 -- Apply
 -------------------------------------------------------------------------------
@@ -993,6 +1072,8 @@ function FadeUI.Apply()
 						h.fadeuiBags = el.key == "bags"
 						h.fadeuiDrag = el.drag
 						h.fadeuiBar = el.bar
+						-- Hover brings back the Map style rather than the cluster (Minimap.lua).
+						h.fadeuiKey = not (el.key == "minimap" and db.minimapShown == "map") and el.key or nil
 						SetDriver(h, driver)
 					else
 						Detach(f)
@@ -1010,6 +1091,7 @@ function FadeUI.Apply()
 	end
 	for _, f in ipairs(released) do Detach(f) end
 
+	UpdateHoverTicker(active)
 	ChatIdleCheck()
 	-- Re-check every element: re-registering a state driver doesn't fire it when
 	-- its state is unchanged (e.g. "hide" before and after toggling FadeUI off and
@@ -1074,6 +1156,13 @@ end
 function FadeUI.SetMode(key, mode)
 	if not (db and BY_KEY[key] and BY_KEY[key].modes.byKey[mode]) then return end
 	db.modes[key] = mode
+	FadeUI.Changed()
+end
+
+-- `field` is "hoverKeep" (Stay) or "hoverShow" (Show).
+function FadeUI.SetHover(field, key, on)
+	if not (db and BY_KEY[key] and (field == "hoverKeep" or field == "hoverShow")) then return end
+	db[field][key] = on and true or nil
 	FadeUI.Changed()
 end
 

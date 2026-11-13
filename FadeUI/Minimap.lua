@@ -144,6 +144,7 @@ local shown       -- whether that driver says show (hides wait for the fade-out 
 local hideTimer
 
 local function OnState(state)
+	if FadeUI.HoverHolds("minimap", shown) then state = "show" end
 	if hideTimer then
 		hideTimer:Cancel()
 		hideTimer = nil
@@ -165,6 +166,13 @@ end
 stateFrame:SetScript("OnAttributeChanged", function(_, name, value)
 	if name == "state-fadeui" then OnState(value) end
 end)
+
+-- The mouse moved onto or off the minimap (Core's HoverCheck): re-checks the
+-- driver's state, with hover taken into account.
+function FadeUI.RecheckMinimapHover()
+	if not driver then return end
+	OnState((driver == "show" or driver == "hide") and driver or SecureCmdOptionParse(driver))
+end
 
 -- State drivers can only be changed out of combat (Apply runs then).
 local function SetStateDriver(d)

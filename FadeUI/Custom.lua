@@ -85,6 +85,7 @@ function FadeUI.RemoveCustomFrame(name)
 		if db.custom[i] == name then table.remove(db.custom, i) end
 	end
 	db.modes[PREFIX .. name] = nil
+	db.hoverKeep[PREFIX .. name], db.hoverShow[PREFIX .. name] = nil, nil
 	FadeUI.RebuildCustom()
 	FadeUI.Changed()
 end
