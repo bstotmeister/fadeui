@@ -71,19 +71,22 @@ The icon flashes when the spell is ready, and hides when you cast it or after a 
 ## More features
 
 - **Smooth fading:** set the fade-in time, the fade-out time, and a delay before fading out (for example, right after combat ends). In combat, elements always hide instantly.
+- **Hover to show:** for each element, keep it up while the mouse is over it, or show it whenever you hover its spot.
 - **One-click setup:** click a column header in the options window to set every element to that mode.
 - **Search:** type in the options window to find an element quickly.
 - **Edit Mode friendly:** everything is shown while Edit Mode is open, so you can still move your frames.
 - **Instant off switch:** turning FadeUI off puts everything back exactly as Blizzard had it.
-- **Account-wide settings:** every character shares one setup, or tick a box to give a character its own.
+- **Profiles:** save different setups (questing, raiding...) and switch between them. Profiles are shared across your account, each character remembers its own, and you can export a profile as text to share it or import someone else's.
+- **Undo and redo:** step back and forth through your changes since you logged in, so a misclick (or Reset to defaults) is easy to take back.
 
 ## Commands and keybinds
 
 - `/fadeui` or `/fui` opens the options window
 - `/fui toggle`, `/fui on` or `/fui off` switches FadeUI on and off
 - `/fui range` unlocks the spell helper icon so you can drag it into place (type it again to lock it)
+- `/fui profile` lists your profiles, and `/fui profile <name>` switches to one (handy in a macro)
 - `/fui combat` simulates combat (type it again to stop), so you can try out your settings without a fight. The options window has a button for it too
-- `/fui reset` goes back to the default settings
+- `/fui reset` resets the current profile to the default settings
 - **Key Bindings > AddOns > FadeUI** has binds for the on/off toggle and for opening the options window
 - **Addon compartment button (minimap):** left-click toggles FadeUI, right-click opens the options window
 

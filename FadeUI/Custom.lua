@@ -46,6 +46,12 @@ local function Owner(name)
 	end
 end
 
+-- Whether a name can be a custom frame, for a profile being imported: not one
+-- FadeUI refuses, or one an element already has.
+function FadeUI.CanBeCustom(name)
+	return name ~= "" and not REFUSED[name] and not Owner(name)
+end
+
 -- Returns whether it was added, and a message saying what happened.
 function FadeUI.AddCustomFrame(name)
 	local db = FadeUI.GetDB()
@@ -79,6 +85,7 @@ function FadeUI.RemoveCustomFrame(name)
 		if db.custom[i] == name then table.remove(db.custom, i) end
 	end
 	db.modes[PREFIX .. name] = nil
+	db.hoverKeep[PREFIX .. name], db.hoverShow[PREFIX .. name] = nil, nil
 	FadeUI.RebuildCustom()
 	FadeUI.Changed()
 end

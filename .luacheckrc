@@ -41,6 +41,7 @@ read_globals = {
 	"FrameUtil",
 	"GameTooltip",
 	"GetBindingKey",
+	"GetCursorPosition",
 	"GetMouseFoci",
 	"GetMouseFocus",
 	"GetMacroInfo",
@@ -65,4 +66,6 @@ read_globals = {
 	"hooksecurefunc",
 	"strtrim",
 	"tinsert",
+	"UnitName",
+	"GetRealmName",
 }
