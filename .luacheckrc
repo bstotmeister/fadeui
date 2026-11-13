@@ -41,6 +41,7 @@ read_globals = {
 	"FrameUtil",
 	"GameTooltip",
 	"GetBindingKey",
+	"GetCursorPosition",
 	"GetMouseFoci",
 	"GetMouseFocus",
 	"GetMacroInfo",

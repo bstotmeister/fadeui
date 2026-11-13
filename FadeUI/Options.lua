@@ -11,11 +11,13 @@ local BTN_HI  = { 0.190, 0.190, 0.220 }
 local ACCENT  = { 0.400, 0.800, 1.000 }
 local MUTED   = { 0.560, 0.560, 0.600 }
 
-local WIDTH, HEIGHT = 740, 640
+local WIDTH, HEIGHT = 830, 640
 local PAD = 16
 local LABEL_W = 196
 local SEG_W, SEG_H, SEG_GAP = 96, 20, 3
 local ROW_H, GROUP_H = 26, 30
+-- The On hover columns (Stay and Show), after the five mode buttons.
+local HOVER_X, HOVER_W = LABEL_W + 5 * (SEG_W + SEG_GAP) + 8, 44
 
 local win
 local rows = {}
@@ -182,6 +184,14 @@ local function GroupHeader(parent, title)
 	return h
 end
 
+local PROTECTED_NOTE = "\n\nIn combat this doesn't work for action bars, unit frames and other protected frames."
+local HOVER = {
+	{ field = "hoverKeep", label = "Stay", title = "Stay while hovered",
+	  tip = "While it's shown, it stays shown as long as the mouse is over it, e.g. a damage meter you're reading as combat ends. Moving the mouse away waits the Delay, then it fades out." .. PROTECTED_NOTE },
+	{ field = "hoverShow", label = "Show", title = "Show on hover",
+	  tip = "Shows it whenever the mouse is over where it would be, instead of hiding it completely like Alt-Z. Moving the mouse away waits the Delay, then it fades out. While it's hidden, its spot doesn't block clicks." .. PROTECTED_NOTE },
+}
+
 -- Everything the row does goes by row.el, so a custom frame's row can be
 -- reused for another (see RefreshCustomRows).
 local function ElementRow(parent, el)
@@ -222,6 +232,16 @@ local function ElementRow(parent, el)
 		b.mode = mode
 		Tooltip(b, function() return row.el.label .. ": " .. mode.label end, mode.tip)
 		row.segs[i] = b
+	end
+
+	-- Stay and Show, in their columns at the end of the row.
+	row.hover = {}
+	for i, info in ipairs(HOVER) do
+		local c = Checkbox(row, "", function(self) FadeUI.SetHover(info.field, row.el.key, self:GetChecked()) end)
+		c:SetPoint("LEFT", HOVER_X + (i - 1) * HOVER_W + (HOVER_W - 16) / 2, 0)
+		c.field = info.field
+		Tooltip(c, function() return row.el.label .. ": " .. info.title end, info.tip)
+		row.hover[i] = c
 	end
 
 	-- A custom frame's row has a remove button at the end of its label.
@@ -277,6 +297,7 @@ local function ElementRow(parent, el)
 	local function out() hl:Hide() end
 	name:HookScript("OnEnter", over) name:HookScript("OnLeave", out)
 	for _, b in ipairs(row.segs) do b:HookScript("OnEnter", over) b:HookScript("OnLeave", out) end
+	for _, c in ipairs(row.hover) do c:HookScript("OnEnter", over) c:HookScript("OnLeave", out) end
 
 	rows[#rows + 1] = row
 	return row
@@ -738,7 +759,8 @@ local function Build()
 	refs.status:SetJustifyH("LEFT")
 
 	-- Column headers: click one to set every element to that mode
-	y = y - 26
+	-- (with room above for the "On hover" label over Stay and Show)
+	y = y - 38
 	local cols = CreateFrame("Frame", nil, win)
 	cols:SetPoint("TOPLEFT", PAD, y)
 	cols:SetPoint("RIGHT", -PAD - 8, 0)
@@ -759,6 +781,16 @@ local function Build()
 		Tooltip(h, "Set all: " .. mode.label, "Set every element in the list to \"" .. mode.label
 			.. "\". While searching, only the elements that match.")
 	end
+	for i, info in ipairs(HOVER) do
+		local h = CreateFrame("Frame", nil, cols)
+		h:SetSize(HOVER_W, 18)
+		h:SetPoint("LEFT", HOVER_X + (i - 1) * HOVER_W, 0)
+		h:EnableMouse(true)
+		Text(h, "GameFontDisableSmall", info.label):SetPoint("CENTER")
+		Tooltip(h, info.title, info.tip)
+	end
+	local onHover = Text(cols, "GameFontDisableSmall", "On hover")
+	onHover:SetPoint("BOTTOM", cols, "TOPLEFT", HOVER_X + HOVER_W, 0)
 	local colRule = cols:CreateTexture(nil, "ARTWORK")
 	colRule:SetColorTexture(LINE[1], LINE[2], LINE[3], 1)
 	colRule:SetHeight(1)
@@ -837,6 +869,13 @@ function FadeUI.RefreshOptions()
 				row.bagsOpen:SetAlpha((missing or current == "always") and 0.45 or 1)
 			end
 			if row.barsDrag then row.barsDrag:SetChecked(db.barsDrag) end
+			-- They do nothing in Always mode, and Show covers Stay.
+			local off = missing or current == "always"
+			local showOn = db.hoverShow[row.el.key]
+			for _, c in ipairs(row.hover) do
+				c:SetChecked(db[c.field][row.el.key] and true or false)
+				c:SetAlpha((off or (c.field == "hoverKeep" and showOn)) and 0.45 or 1)
+			end
 			if missing then
 				row.label:SetText(row.el.label .. " |cff777777(not found)|r")
 				row.label:SetTextColor(0.5, 0.5, 0.5)
