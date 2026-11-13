@@ -165,6 +165,31 @@ local function SearchBox(parent, w, h, hint, onChange)
 	return e
 end
 
+-- A box showing `url`, selected whenever it's clicked so it can be copied.
+-- Typing in it puts the link back.
+local function LinkBox(parent, url)
+	local e = CreateFrame("EditBox", nil, parent)
+	e:SetHeight(SEG_H)
+	e:SetAutoFocus(false)
+	e:SetFontObject("GameFontHighlightSmall")
+	e:SetTextInsets(6, 6, 0, 0)
+	Fill(e, "BACKGROUND", BTN)
+	Outline(e, LINE)
+	e:SetText(url)
+	e:SetCursorPosition(0)
+	e:SetScript("OnTextChanged", function(self, userInput)
+		if userInput then
+			self:SetText(url)
+			self:HighlightText()
+		end
+	end)
+	e:SetScript("OnEditFocusGained", e.HighlightText)
+	e:SetScript("OnMouseUp", e.HighlightText) -- the click itself moves the cursor
+	e:SetScript("OnEditFocusLost", function(self) self:HighlightText(0, 0) end)
+	e:SetScript("OnEnterPressed", e.ClearFocus)
+	return e
+end
+
 -------------------------------------------------------------------------------
 -- Rows
 -------------------------------------------------------------------------------
@@ -769,6 +794,13 @@ end
 -- Window
 -------------------------------------------------------------------------------
 
+-- Shown by the Feedback / Requests button. GitHub opens the issue forms
+-- (bug report, feature request).
+local FEEDBACK_LINKS = {
+	{ label = "Bugs and requests (GitHub):", url = "https://github.com/bstotmeister/fadeui/issues/new/choose" },
+	{ label = "Comments (CurseForge):",      url = "https://www.curseforge.com/wow/addons/fadeui/comments" },
+}
+
 local FADE_BOXES = {
 	{ field = "fadeIn",    label = "Fade in",
 	  tip = "Seconds an element takes to fade in when it appears. 0 = instant." },
@@ -1086,6 +1118,52 @@ local function Build()
 		"Acts as if you're in combat, so you can see what each mode shows and hides. Click again (or type /fui combat) to end it, or it ends when a real fight starts.")
 	refs.keyHint = Text(foot, "GameFontHighlightSmall", "", MUTED)
 	refs.keyHint:SetPoint("RIGHT", -PAD, 0)
+
+	-- Feedback links, in a strip that drops down under the header while it's
+	-- open, over the settings below. Addons can't open a browser, so each link
+	-- is in a box that's selected when you click it, ready to copy.
+	local links = CreateFrame("Frame", nil, win)
+	links:SetPoint("TOPLEFT", head, "BOTTOMLEFT")
+	links:SetPoint("TOPRIGHT", head, "BOTTOMRIGHT")
+	links:SetHeight(80)
+	links:SetFrameLevel(win:GetFrameLevel() + 20) -- above everything else in the window
+	links:EnableMouse(true) -- clicks don't reach the settings under it
+	Fill(links, "BACKGROUND", CARD)
+	local linksRule = links:CreateTexture(nil, "ARTWORK")
+	linksRule:SetColorTexture(LINE[1], LINE[2], LINE[3], 1)
+	linksRule:SetHeight(1)
+	linksRule:SetPoint("BOTTOMLEFT") linksRule:SetPoint("BOTTOMRIGHT")
+	Text(links, "GameFontHighlightSmall", "Click a link and press Ctrl+C (Cmd+C on a Mac) to copy it, then paste it in your browser.", MUTED)
+		:SetPoint("TOPLEFT", PAD, -9)
+	local boxes = {}
+	for i, link in ipairs(FEEDBACK_LINKS) do
+		local top = -6 - i * 24
+		Text(links, "GameFontHighlight", link.label):SetPoint("TOPLEFT", PAD, top - 3)
+		local e = LinkBox(links, link.url)
+		e:SetPoint("TOPLEFT", PAD + 230, top)
+		e:SetPoint("RIGHT", -PAD, 0)
+		e:SetScript("OnEscapePressed", function() links:Hide() end)
+		boxes[i] = e
+	end
+	links:Hide()
+
+	-- In the header, next to the close button: the footer is full.
+	local feedback = Button(head, "Feedback / Requests", 150, 24, function()
+		links:SetShown(not links:IsShown())
+	end)
+	feedback:SetPoint("RIGHT", close, "LEFT", -8, 0)
+	Tooltip(feedback, "Feedback / Requests",
+		"Where to report a bug, ask for a feature or for another addon to be supported, or leave a comment.")
+	-- Opening it selects the first link, so Ctrl+C copies it straight away.
+	links:SetScript("OnShow", function()
+		SetActive(feedback, true)
+		boxes[1]:SetFocus()
+	end)
+	links:SetScript("OnHide", function()
+		SetActive(feedback, false)
+		for _, e in ipairs(boxes) do e:ClearFocus() end
+	end)
+	win:HookScript("OnHide", function() links:Hide() end)
 
 	-- Last, since it refreshes the whole window: makes the custom frame rows and
 	-- lays out the list.
