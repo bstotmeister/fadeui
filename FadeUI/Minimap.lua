@@ -197,7 +197,7 @@ function FadeUI.RefreshMinimap()
 	local shownMap = db.minimapShown == "map"
 
 	local mode = FadeUI.BY_KEY.minimap.modes.byKey[db.modes.minimap]
-	SetStateDriver(active and shownMap and mode and mode.driver or nil)
+	SetStateDriver(active and shownMap and mode and FadeUI.Driver(mode) or nil)
 
 	-- Only while FadeUI has the cluster hidden (Alt-Z hides UIParent, which leaves IsShown() true).
 	local h = FadeUI.GetHolder(cluster)

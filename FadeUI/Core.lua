@@ -74,6 +74,14 @@ end
 local MODE = FadeUI.MODES.byKey
 FadeUI.MODE = MODE
 
+-- While simulating combat (see SetSimCombat), drivers treat [combat] as always
+-- true, so modes can be tried out without a fight. Not saved.
+FadeUI.simCombat = false
+function FadeUI.Driver(mode)
+	if FadeUI.simCombat then return (mode.driver:gsub("%[combat%]", "[]")) end
+	return mode.driver
+end
+
 -------------------------------------------------------------------------------
 -- Elements
 -------------------------------------------------------------------------------
@@ -376,7 +384,7 @@ local function Holder_State(h, state, now)
 			fading[h] = 1 -- fade back in from wherever the fade-out got to
 			animator:Show()
 		end
-	elseif InCombatLockdown() or not loggedIn then
+	elseif InCombatLockdown() or FadeUI.simCombat or not loggedIn then
 		fading[h] = nil
 		FinishHide(h)
 	elseif h:IsShown() and fading[h] ~= 0 then
@@ -731,7 +739,7 @@ function FadeUI.Apply()
 	for _, el in ipairs(ELEMENTS) do
 		el.found = 0
 		local mode = el.modes.byKey[db.modes[el.key]] or el.modes.byKey.always
-		local driver = mode.driver
+		local driver = FadeUI.Driver(mode)
 		-- The map replaces the normal minimap while shown (Minimap.lua), so the cluster stays hidden.
 		if el.key == "minimap" and db.minimapShown == "map" then driver = "hide" end
 		for _, name in ipairs(el.frames) do
@@ -869,6 +877,17 @@ end
 function FadeUI.SetBarsDrag(on)
 	if not db then return end
 	db.barsDrag = on and true or false
+	FadeUI.Changed()
+end
+
+-- Acts as if you're in combat, to try out the modes. A real fight ends it.
+function FadeUI.SetSimCombat(on)
+	on = on and true or false
+	if on == FadeUI.simCombat then return end
+	if on and InCombatLockdown() then return Print("you're already in combat.") end
+	FadeUI.simCombat = on
+	Print(on and "simulating combat. Type |cffffff00/fui combat|r again to stop."
+		or "combat simulation ended.")
 	FadeUI.Changed()
 end
 
@@ -1040,6 +1059,8 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		BarsPeek()
 
 	elseif event == "PLAYER_REGEN_DISABLED" then
+		-- A real fight takes over from a simulated one.
+		if FadeUI.simCombat then FadeUI.SetSimCombat(false) end
 		if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
 
 	elseif event == "PLAYER_REGEN_ENABLED" then
@@ -1079,11 +1100,14 @@ SlashCmdList.FADEUI = function(msg)
 		Print(FadeUI.IsRangeIconUnlocked()
 			and "helper icon unlocked: drag it into place. Type |cffffff00/fui range|r again to lock it."
 			or "helper icon locked. It appears when a spell fails out of range, short on resource or on cooldown.")
+	elseif cmd == "combat" then
+		FadeUI.SetSimCombat(not FadeUI.simCombat)
 	else
 		Print("commands:")
 		Print("  /fui - open the options window")
 		Print("  /fui toggle | on | off - switch FadeUI (like Alt-Z)")
 		Print("  /fui range - unlock (to move) or lock the range/resource/cooldown helper icon")
+		Print("  /fui combat - simulate combat (or stop), to try out your settings")
 		Print("  /fui reset - back to default settings")
 	end
 end
