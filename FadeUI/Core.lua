@@ -196,11 +196,15 @@ end
 -------------------------------------------------------------------------------
 -- Settings
 --
--- Settings are account-wide (FadeUIAccountDB). A character can switch to its
--- own instead, kept in its per-character FadeUIDB with perCharacter = true.
+-- Settings live in named profiles, shared by every character on the account
+-- (FadeUIAccountDB.profiles). Each character remembers which one it uses
+-- (FadeUIDB.profile), and changes go straight into that profile.
 -------------------------------------------------------------------------------
 
-local db -- the settings in use: FadeUIAccountDB, or this character's FadeUIDB
+local db -- the settings in use: this character's profile
+local RecordHistory -- see Undo and redo
+local DEFAULT_PROFILE = "Default" -- always there; characters fall back to it
+FadeUI.DEFAULT_PROFILE = DEFAULT_PROFILE
 FadeUI.editMode = false
 FadeUI.pendingApply = false
 local loggedIn = false
@@ -246,7 +250,7 @@ local function FillMissing(t)
 	end
 end
 
--- Copies the settings (not the perCharacter switch) from one table to another.
+-- Copies the settings (and nothing else) from one table to another.
 local function CopySettings(from, to)
 	local d = {}
 	Defaults(d)
@@ -255,30 +259,292 @@ local function CopySettings(from, to)
 	for key, mode in pairs(from.modes or {}) do to.modes[key] = mode end
 	to.custom = {}
 	for i, name in ipairs(from.custom or {}) do to.custom[i] = name end
+	-- Settings from before hover had none, so they're left out and get the defaults.
 	for _, field in ipairs({ "hoverKeep", "hoverShow" }) do
-		to[field] = {}
-		for key, on in pairs(from[field] or {}) do to[field][key] = on end
+		to[field] = nil
+		if type(from[field]) == "table" then
+			to[field] = {}
+			for key, on in pairs(from[field]) do to[field][key] = on end
+		end
 	end
 end
 
--- Picks the account-wide or this character's settings. A character's own
--- settings start as a copy of the account-wide ones.
-local function UseSettings()
-	if FadeUIDB.perCharacter and type(FadeUIDB.modes) ~= "table" then
-		CopySettings(FadeUIAccountDB, FadeUIDB)
-	end
-	db = FadeUIDB.perCharacter and FadeUIDB or FadeUIAccountDB
+-- Removes the settings from a table, leaving anything else in it.
+local function ClearSettings(t)
+	local d = {}
+	Defaults(d)
+	for k in pairs(d) do t[k] = nil end
+end
+
+-- Uses this character's profile (FadeUIDB.profile, which must exist).
+local function UseProfile()
+	db = FadeUIAccountDB.profiles[FadeUIDB.profile]
 	FillMissing(db)
 	FadeUI.RebuildCustom()
+	RecordHistory() -- how it starts, for undo
 end
 
 function FadeUI.GetDB() return db end
 
-function FadeUI.IsPerCharacter()
-	return type(FadeUIDB) == "table" and FadeUIDB.perCharacter or false
+FadeUI.MAX_TIME = 999 -- tenths of a second
+
+-------------------------------------------------------------------------------
+-- Profiles
+-------------------------------------------------------------------------------
+
+function FadeUI.GetProfile() return FadeUIDB and FadeUIDB.profile end
+
+-- Every profile's name: Default first, then the rest in alphabetical order.
+function FadeUI.GetProfiles()
+	local list = {}
+	for name in pairs(FadeUIAccountDB.profiles) do
+		if name ~= DEFAULT_PROFILE then list[#list + 1] = name end
+	end
+	table.sort(list, function(a, b) return a:lower() < b:lower() end)
+	table.insert(list, 1, DEFAULT_PROFILE)
+	return list
 end
 
-FadeUI.MAX_TIME = 999 -- tenths of a second
+-- The profile with this name, ignoring case, as its name is stored.
+function FadeUI.FindProfile(name)
+	if type(name) ~= "string" then return nil end
+	name = strtrim(name)
+	local profiles = FadeUIAccountDB.profiles
+	if profiles[name] then return name end
+	for n in pairs(profiles) do
+		if n:lower() == name:lower() then return n end
+	end
+end
+
+-- A new profile's name, trimmed; or nil, and why it can't be used.
+local function NewProfileName(name)
+	name = strtrim(name or "")
+	if name == "" then return nil, "Type a name for the profile." end
+	local taken = FadeUI.FindProfile(name)
+	if taken then return nil, "There's already a profile named " .. taken .. "." end
+	return name
+end
+
+-- Switches this character to another profile. Returns whether there was one
+-- by that name.
+function FadeUI.SetProfile(name)
+	name = FadeUI.FindProfile(name)
+	if not (db and name) then return false end
+	FadeUIDB.profile = name
+	UseProfile()
+	FadeUI.Changed()
+	return true
+end
+
+-- Saves a copy of the current profile under a new name, and switches to it.
+-- Returns why not, if the name can't be used.
+function FadeUI.NewProfile(name)
+	if not db then return "" end
+	local newName, err = NewProfileName(name)
+	if not newName then return err end
+	local t = {}
+	CopySettings(db, t)
+	FadeUIAccountDB.profiles[newName] = t
+	FadeUI.SetProfile(newName)
+end
+
+-- Deletes the current profile (not Default) and switches to Default. Other
+-- characters using it switch to Default when they next log in.
+function FadeUI.DeleteProfile()
+	local name = FadeUI.GetProfile()
+	if not db or name == DEFAULT_PROFILE then return end
+	FadeUIAccountDB.profiles[name] = nil
+	FadeUI.SetProfile(DEFAULT_PROFILE)
+end
+
+-- Sharing: a profile as one line of text, "FadeUI:1:" and then key=value pairs
+-- separated by commas. Settings go by name rather than position, so a string
+-- still works after settings or elements are added; anything it doesn't have
+-- gets its default. `enabled` is left out: importing never turns FadeUI on or off.
+--   <setting>=<value>   booleans are 1 or 0
+--   m.<element>=<mode>
+--   c.<frame>=<mode>    custom frames, in order; names are %-escaped
+--   h.<element>=keep, show or keep+show   On hover: Stay, Show (keys %-escaped,
+--                       as a custom frame's is "custom:<frame>"); none means neither
+local SHARE_VERSION = 1
+
+local ANCHORS = { TOPLEFT = true, TOP = true, TOPRIGHT = true, LEFT = true, CENTER = true,
+	RIGHT = true, BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true }
+-- The values each text setting can have. One missing here is never imported.
+local CHOICES = {
+	minimapShown = { normal = true, map = true },
+	minimapHidden = { none = true, nodes = true, map = true },
+	rangePoint = ANCHORS, rangeRelPoint = ANCHORS,
+}
+-- Number settings that aren't times. Times are kept to 0..MAX_TIME, like SetTime;
+-- map sizes are snapped by Minimap.lua.
+local NOT_TIMES = { rangeX = true, rangeY = true, minimapShownSize = true, minimapHiddenSize = true }
+
+local function Escape(s)
+	return (s:gsub("[^%w_]", function(c) return ("%%%02X"):format(c:byte()) end))
+end
+
+local function Unescape(s)
+	return (s:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end))
+end
+
+function FadeUI.ExportProfile()
+	if not db then return "" end
+	local d = {}
+	Defaults(d)
+	local keys = {}
+	for k, v in pairs(d) do
+		if k ~= "enabled" and type(v) ~= "table" then keys[#keys + 1] = k end
+	end
+	table.sort(keys)
+	local parts = {}
+	for _, k in ipairs(keys) do
+		local v = db[k]
+		if type(v) == "boolean" then v = v and 1 or 0 end
+		parts[#parts + 1] = k .. "=" .. tostring(v)
+	end
+	for _, el in ipairs(ELEMENTS) do
+		if not el.custom then parts[#parts + 1] = "m." .. el.key .. "=" .. (db.modes[el.key] or el.default) end
+	end
+	for _, name in ipairs(db.custom) do
+		parts[#parts + 1] = "c." .. Escape(name) .. "=" .. (db.modes["custom:" .. name] or "always")
+	end
+	-- In element order (custom frames last), so the same settings always give the same string.
+	for _, el in ipairs(ELEMENTS) do
+		local keep, show = db.hoverKeep[el.key], db.hoverShow[el.key]
+		if keep or show then
+			parts[#parts + 1] = "h." .. Escape(el.key) .. "=" .. (keep and show and "keep+show" or keep and "keep" or "show")
+		end
+	end
+	return "FadeUI:" .. SHARE_VERSION .. ":" .. table.concat(parts, ",")
+end
+
+-- The settings in a profile string (with the current on/off switch); or nil,
+-- and why it can't be used.
+local function DecodeProfile(text)
+	local version, body = (text or ""):gsub("%s", ""):match("^FadeUI:(%d+):(.*)$")
+	if not version then return nil, "That isn't a FadeUI profile string." end
+	if tonumber(version) > SHARE_VERSION then
+		return nil, "That profile is from a newer version of FadeUI. Update FadeUI to import it."
+	end
+
+	local d = {}
+	Defaults(d)
+	local t = { enabled = db.enabled, modes = {}, custom = {}, hoverKeep = {}, hoverShow = {} }
+	local used, customSeen, hover = 0, {}, {}
+	for key, value in body:gmatch("([^,=]+)=([^,]*)") do
+		local kind, rest = key:match("^(%a)%.(.+)$")
+		local default = d[key]
+		local ok = false
+		if kind == "m" then
+			local el = BY_KEY[rest]
+			if el and not el.custom and el.modes.byKey[value] then
+				t.modes[rest], ok = value, true
+			end
+		elseif kind == "c" then
+			local frame = Unescape(rest)
+			if MODE[value] and not customSeen[frame] and FadeUI.CanBeCustom(frame) then
+				customSeen[frame] = true
+				t.custom[#t.custom + 1] = frame
+				t.modes["custom:" .. frame], ok = value, true
+			end
+		elseif kind == "h" then
+			if value == "keep" or value == "show" or value == "keep+show" then
+				hover[#hover + 1] = { key = Unescape(rest), value = value }
+				ok = true
+			end
+		elseif type(default) == "boolean" and key ~= "enabled" then
+			if value == "1" or value == "0" then t[key], ok = value == "1", true end
+		elseif type(default) == "number" then
+			local n = tonumber(value)
+			if n and n == n and math.abs(n) ~= math.huge then
+				t[key] = NOT_TIMES[key] and n or math.min(FadeUI.MAX_TIME, math.max(0, math.floor(n + 0.5)))
+				ok = true
+			end
+		elseif type(default) == "string" then
+			if CHOICES[key] and CHOICES[key][value] then t[key], ok = value, true end
+		end
+		if ok then used = used + 1 end
+	end
+	-- Hover goes on elements this version has, and on the string's own custom frames.
+	for _, h in ipairs(hover) do
+		local el, frame = BY_KEY[h.key], h.key:match("^custom:(.+)$")
+		if (el and not el.custom) or (frame and customSeen[frame]) then
+			t.hoverKeep[h.key] = h.value ~= "show" or nil
+			t.hoverShow[h.key] = h.value ~= "keep" or nil
+		end
+	end
+	if used == 0 then return nil, "That profile string is empty or damaged." end
+	FillMissing(t)
+	return t
+end
+
+-- Makes a new profile from an exported string, and switches to it. Returns why
+-- not, if the name or the string can't be used. Values that don't fit (a mode
+-- an element doesn't have, a setting this version doesn't know) are skipped.
+function FadeUI.ImportProfile(name, text)
+	if not db then return "" end
+	local newName, err = NewProfileName(name)
+	if not newName then return err end
+	local t
+	t, err = DecodeProfile(text)
+	if not t then return err end
+	FadeUIAccountDB.profiles[newName] = t
+	FadeUI.SetProfile(newName)
+end
+
+-------------------------------------------------------------------------------
+-- Undo and redo
+--
+-- For this session, each profile remembers how it was before each change (as
+-- a profile string, see ExportProfile), so changes can be undone and redone.
+-- The on/off switch isn't part of it, just as it isn't part of a shared profile.
+-------------------------------------------------------------------------------
+
+local MAX_UNDO = 50
+local history = setmetatable({}, { __mode = "k" }) -- profile -> { undo = {}, redo = {}, now = string }
+
+-- Called as a profile comes into use, and by Changed. If the profile has
+-- changed since last time, how it was goes on its undo list, and what was
+-- undone can't be redone any more.
+function RecordHistory()
+	if not db then return end
+	local now = FadeUI.ExportProfile()
+	local h = history[db]
+	if not h then
+		history[db] = { undo = {}, redo = {}, now = now }
+	elseif now ~= h.now then
+		table.insert(h.undo, h.now)
+		if #h.undo > MAX_UNDO then table.remove(h.undo, 1) end
+		h.redo = {}
+		h.now = now
+	end
+end
+
+-- Takes the last state off one list (`from`), puts how the profile is now on
+-- the other, and makes the profile that state.
+local function StepHistory(from, to)
+	local h = db and history[db]
+	local s = h and table.remove(h[from])
+	local t = s and DecodeProfile(s)
+	if not t then return false end
+	table.insert(h[to], h.now)
+	CopySettings(t, db)
+	FadeUI.RebuildCustom()
+	h.now = FadeUI.ExportProfile()
+	FadeUI.Changed()
+	return true
+end
+
+function FadeUI.Undo() return StepHistory("undo", "redo") end
+function FadeUI.Redo() return StepHistory("redo", "undo") end
+
+-- How many steps can be undone, and redone.
+function FadeUI.HistorySize()
+	local h = db and history[db]
+	if not h then return 0, 0 end
+	return #h.undo, #h.redo
+end
 
 -------------------------------------------------------------------------------
 -- Holders
@@ -897,6 +1163,7 @@ end
 
 -- Call after changing any setting.
 function FadeUI.Changed()
+	RecordHistory()
 	FadeUI.Apply()
 	if FadeUI.RefreshRangeHelper then FadeUI.RefreshRangeHelper() end
 	if FadeUI.RefreshOptions then FadeUI.RefreshOptions() end
@@ -906,14 +1173,6 @@ end
 function FadeUI.SetHelper(field, on)
 	if not db then return end
 	db[field] = on and true or false
-	FadeUI.Changed()
-end
-
--- Switches this character between the account-wide settings and its own.
-function FadeUI.SetPerCharacter(on)
-	if not db then return end
-	FadeUIDB.perCharacter = on and true or false
-	UseSettings()
 	FadeUI.Changed()
 end
 
@@ -1007,24 +1266,60 @@ events:RegisterEvent("PET_BAR_SHOWGRID")   -- the same, for pet actions
 events:RegisterEvent("PET_BAR_HIDEGRID")
 
 local firstRun = false
+local lostProfile -- the deleted profile this character was using, told at login
+
+-- Settings from before profiles become profiles: the account-wide settings
+-- (1.1 to 1.4, kept in FadeUIAccountDB itself) become Default, and a
+-- character's own (in its FadeUIDB: "this character only" in 1.1 to 1.4, or
+-- from 1.0) become a profile named after it, which it uses if it had the box ticked.
+local function MigrateSettings()
+	local charSettings = type(FadeUIDB.modes) == "table"
+	if type(FadeUIAccountDB.profiles) ~= "table" then
+		local default = {}
+		if type(FadeUIAccountDB.modes) == "table" then
+			CopySettings(FadeUIAccountDB, default)
+		elseif charSettings then
+			CopySettings(FadeUIDB, default) -- straight from 1.0: these are everyone's now
+			charSettings = false
+		else
+			firstRun = true
+		end
+		ClearSettings(FadeUIAccountDB)
+		FadeUIAccountDB.profiles = { [DEFAULT_PROFILE] = default }
+	end
+	if charSettings then
+		local base = UnitName("player") or "Character"
+		local realm = GetRealmName()
+		if realm and realm ~= "" then base = base .. " - " .. realm end
+		local name, n = base, 2
+		while FadeUI.FindProfile(name) do
+			name, n = base .. " " .. n, n + 1
+		end
+		local t = {}
+		CopySettings(FadeUIDB, t)
+		FadeUIAccountDB.profiles[name] = t
+		if FadeUIDB.perCharacter then FadeUIDB.profile = name end
+	end
+	ClearSettings(FadeUIDB)
+	FadeUIDB.perCharacter = nil
+end
 
 events:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
 		if arg1 == ADDON then
 			if type(FadeUIDB) ~= "table" then FadeUIDB = {} end
-			if type(FadeUIAccountDB) ~= "table" then
-				-- First load with account-wide settings: start them from this
-				-- character's settings (from when they were per character), if any.
-				FadeUIAccountDB = {}
-				if type(FadeUIDB.modes) == "table" then
-					CopySettings(FadeUIDB, FadeUIAccountDB)
-				else
-					firstRun = true
-				end
-			end
+			if type(FadeUIAccountDB) ~= "table" then FadeUIAccountDB = {} end
 			FadeUIDB.macro, FadeUIAccountDB.macro = nil, nil -- the old settings-macro switch
 			FadeUIDB.watch = nil -- the range helper's old spell slot (never released)
-			UseSettings()
+			MigrateSettings()
+			local profiles = FadeUIAccountDB.profiles
+			if type(profiles[DEFAULT_PROFILE]) ~= "table" then profiles[DEFAULT_PROFILE] = {} end
+			local name = FadeUIDB.profile
+			if type(name) ~= "string" or type(profiles[name]) ~= "table" then
+				if type(name) == "string" then lostProfile = name end -- deleted on another character
+				FadeUIDB.profile = DEFAULT_PROFILE
+			end
+			UseProfile()
 		elseif loggedIn then
 			-- A Blizzard module or addon loaded late may have created one of our
 			-- frames, or be one FadeUI supports (Addons.lua).
@@ -1042,6 +1337,9 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		if firstRun then
 			Print("is %s. Type |cffffff00/fui|r to choose what shows and when. Bind a toggle key under Key Bindings > AddOns.",
 				db.enabled and "ON" or "off")
+		end
+		if lostProfile then
+			Print("the profile %s was deleted, so this character uses %s now.", lostProfile, DEFAULT_PROFILE)
 		end
 
 		-- Typing: a chat edit box asked to take focus (Enter, /, reply...) brings
@@ -1162,7 +1460,20 @@ SlashCmdList.FADEUI = function(msg)
 		Print(cmd == "on" and "on." or "off. Your normal UI is back.")
 	elseif cmd == "reset" then
 		FadeUI.ResetDefaults()
-		Print("settings reset to defaults.")
+		Print("the profile %s is reset to defaults.", FadeUI.GetProfile())
+	elseif cmd == "profile" then
+		local name = msg:match("^%S+%s+(.+)$")
+		if not name then
+			local list = FadeUI.GetProfiles()
+			for i, n in ipairs(list) do
+				if n == FadeUI.GetProfile() then list[i] = "|cffffffff" .. n .. "|r (in use)" end
+			end
+			Print("profiles: %s. Type |cffffff00/fui profile <name>|r to switch.", table.concat(list, ", "))
+		elseif FadeUI.SetProfile(name) then
+			Print("now using the profile %s.", FadeUI.GetProfile())
+		else
+			Print("there's no profile named %s. Type |cffffff00/fui profile|r to list them.", name)
+		end
 	elseif cmd == "range" then
 		FadeUI.SetRangeIconUnlocked(not FadeUI.IsRangeIconUnlocked())
 		Print(FadeUI.IsRangeIconUnlocked()
@@ -1173,6 +1484,7 @@ SlashCmdList.FADEUI = function(msg)
 		Print("  /fui - open the options window")
 		Print("  /fui toggle | on | off - switch FadeUI (like Alt-Z)")
 		Print("  /fui range - unlock (to move) or lock the range/resource/cooldown helper icon")
-		Print("  /fui reset - back to default settings")
+		Print("  /fui profile [name] - list your profiles, or switch to one")
+		Print("  /fui reset - reset the current profile to default settings")
 	end
 end
