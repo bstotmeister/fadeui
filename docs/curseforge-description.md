@@ -85,6 +85,7 @@ The icon flashes when the spell is ready, and hides when you cast it or after a 
 - `/fui toggle`, `/fui on` or `/fui off` switches FadeUI on and off
 - `/fui range` unlocks the spell helper icon so you can drag it into place (type it again to lock it)
 - `/fui profile` lists your profiles, and `/fui profile <name>` switches to one (handy in a macro)
+- `/fui combat` simulates combat (type it again to stop), so you can try out your settings without a fight. The options window has a button for it too
 - `/fui reset` resets the current profile to the default settings
 - **Key Bindings > AddOns > FadeUI** has binds for the on/off toggle and for opening the options window
 - **Addon compartment button (minimap):** left-click toggles FadeUI, right-click opens the options window

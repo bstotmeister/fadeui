@@ -1078,6 +1078,12 @@ local function Build()
 		"Puts this profile back the way it was before your last change, one change at a time, as far back as when you logged in or reloaded. The on/off switch isn't included.")
 	Tooltip(refs.redo, "Redo",
 		"Makes the change you last undid again. Making a new change instead clears what you can redo.")
+	refs.simCombat = Button(foot, "Simulate combat", 130, 22, function()
+		FadeUI.SetSimCombat(not FadeUI.simCombat)
+	end, FadeUI.MODE.combat.color)
+	refs.simCombat:SetPoint("LEFT", refs.redo, "RIGHT", 8, 0)
+	Tooltip(refs.simCombat, "Simulate combat",
+		"Acts as if you're in combat, so you can see what each mode shows and hides. Click again (or type /fui combat) to end it, or it ends when a real fight starts.")
 	refs.keyHint = Text(foot, "GameFontHighlightSmall", "", MUTED)
 	refs.keyHint:SetPoint("RIGHT", -PAD, 0)
 
@@ -1149,6 +1155,8 @@ function FadeUI.RefreshOptions()
 		status = "|cffffd200Edit Mode is open,|r so everything is shown until you close it."
 	elseif not db.enabled then
 		status = "FadeUI is |cffff6060off|r: your normal UI is showing. Tick the box above, or use your keybind, to turn it on."
+	elseif FadeUI.simCombat then
+		status = "|cffff6060Simulating combat:|r everything shows and hides as it would in a fight. Click End combat to stop."
 	else
 		status = "FadeUI is |cff60ff60on|r. Hidden elements can't be seen or clicked, but their keybinds still work."
 	end
@@ -1176,6 +1184,8 @@ function FadeUI.RefreshOptions()
 	local unlocked = FadeUI.IsRangeIconUnlocked()
 	refs.rangeMove.label:SetText(unlocked and "Lock" or "Move")
 	SetActive(refs.rangeMove, unlocked)
+	refs.simCombat.label:SetText(FadeUI.simCombat and "End combat" or "Simulate combat")
+	SetActive(refs.simCombat, FadeUI.simCombat)
 
 	if refs.scroll.UpdateThumb then refs.scroll.UpdateThumb() end
 end
