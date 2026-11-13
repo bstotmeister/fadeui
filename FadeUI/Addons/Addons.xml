@@ -3,4 +3,5 @@
 	<Script file="Questie.lua"/>
 	<Script file="Chattynator.lua"/>
 	<Script file="Details.lua"/>
+	<Script file="MinimapButtonButton.lua"/>
 </Ui>

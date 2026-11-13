@@ -13,7 +13,7 @@ Built for **WoW Forever**. It's like pressing Alt-Z, but automatic and element b
 - **Play with hidden action bars:** spell helpers show when a spell is out of range, on cooldown or short on mana, and keybinds keep working.
 - **A minimap that stays out of the way:** keep just the herb and ore nodes, or a borderless circular map.
 - **Safe in combat:** built on secure state drivers, so there are no taint errors and no blocked actions.
-- **Other addons too:** Questie, Chattynator and Details! work out of the box, and you can add any other addon's frame yourself.
+- **Other addons too:** Questie, Chattynator, Details! and MinimapButtonButton work out of the box, and you can add any other addon's frame yourself.
 - **Plays nice with Blizzard's UI:** Edit Mode, the Cooldown Manager and the Damage Meter all work, and one toggle puts everything back.
 
 ## Show UI in combat, hide it out of combat
@@ -42,6 +42,7 @@ Bag buttons can also show whenever your bags are open, and action bars show whil
 - **Questie:** its quest tracker follows the Quest Tracker setting.
 - **Chattynator:** the Chat setting fades Chattynator's windows instead of Blizzard's.
 - **Details!:** its windows follow the Damage Meter setting, along with Blizzard's meter.
+- **MinimapButtonButton:** its button gets a Minimap Buttons (MBB) setting of its own, under Other addons.
 
 ## Custom frames: hide any addon's UI
 
