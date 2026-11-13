@@ -114,7 +114,7 @@ FadeUI.GROUPS = {
 	{ title = "Unit frames", items = {
 		{ key = "player",  label = "Player Frame",      frames = { "PlayerFrame" },         default = "target" },
 		{ key = "pet",     label = "Pet Frame",         frames = { "PetFrame" },            default = "target" },
-		{ key = "totems",  label = "Totem Timers",      frames = { "TotemFrame" },          default = "target",
+		{ key = "totems",  label = "Totem Timers",      frames = { "TotemFrame" },          default = "target", direct = true,
 		  note = "Only appears while you have a totem out. Sits under the Player Frame, so it is also hidden whenever that is." },
 		{ key = "target",  label = "Target Frame",      frames = { "TargetFrame" },         default = "target" },
 		{ key = "tot",     label = "Target of Target",  frames = { "TargetFrameToT" },      default = "target",
