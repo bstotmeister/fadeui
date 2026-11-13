@@ -259,9 +259,13 @@ local function CopySettings(from, to)
 	for key, mode in pairs(from.modes or {}) do to.modes[key] = mode end
 	to.custom = {}
 	for i, name in ipairs(from.custom or {}) do to.custom[i] = name end
+	-- Settings from before hover had none, so they're left out and get the defaults.
 	for _, field in ipairs({ "hoverKeep", "hoverShow" }) do
-		to[field] = {}
-		for key, on in pairs(from[field] or {}) do to[field][key] = on end
+		to[field] = nil
+		if type(from[field]) == "table" then
+			to[field] = {}
+			for key, on in pairs(from[field]) do to[field][key] = on end
+		end
 	end
 end
 
@@ -360,6 +364,8 @@ end
 --   <setting>=<value>   booleans are 1 or 0
 --   m.<element>=<mode>
 --   c.<frame>=<mode>    custom frames, in order; names are %-escaped
+--   h.<element>=keep, show or keep+show   On hover: Stay, Show (keys %-escaped,
+--                       as a custom frame's is "custom:<frame>"); none means neither
 local SHARE_VERSION = 1
 
 local ANCHORS = { TOPLEFT = true, TOP = true, TOPRIGHT = true, LEFT = true, CENTER = true,
@@ -403,12 +409,16 @@ function FadeUI.ExportProfile()
 	for _, name in ipairs(db.custom) do
 		parts[#parts + 1] = "c." .. Escape(name) .. "=" .. (db.modes["custom:" .. name] or "always")
 	end
+	-- In element order (custom frames last), so the same settings always give the same string.
+	for _, el in ipairs(ELEMENTS) do
+		local keep, show = db.hoverKeep[el.key], db.hoverShow[el.key]
+		if keep or show then
+			parts[#parts + 1] = "h." .. Escape(el.key) .. "=" .. (keep and show and "keep+show" or keep and "keep" or "show")
+		end
+	end
 	return "FadeUI:" .. SHARE_VERSION .. ":" .. table.concat(parts, ",")
 end
 
--- Makes a new profile from an exported string, and switches to it. Returns why
--- not, if the name or the string can't be used. Values that don't fit (a mode
--- an element doesn't have, a setting this version doesn't know) are skipped.
 -- The settings in a profile string (with the current on/off switch); or nil,
 -- and why it can't be used.
 local function DecodeProfile(text)
@@ -420,8 +430,8 @@ local function DecodeProfile(text)
 
 	local d = {}
 	Defaults(d)
-	local t = { enabled = db.enabled, modes = {}, custom = {} }
-	local used, customSeen = 0, {}
+	local t = { enabled = db.enabled, modes = {}, custom = {}, hoverKeep = {}, hoverShow = {} }
+	local used, customSeen, hover = 0, {}, {}
 	for key, value in body:gmatch("([^,=]+)=([^,]*)") do
 		local kind, rest = key:match("^(%a)%.(.+)$")
 		local default = d[key]
@@ -438,6 +448,11 @@ local function DecodeProfile(text)
 				t.custom[#t.custom + 1] = frame
 				t.modes["custom:" .. frame], ok = value, true
 			end
+		elseif kind == "h" then
+			if value == "keep" or value == "show" or value == "keep+show" then
+				hover[#hover + 1] = { key = Unescape(rest), value = value }
+				ok = true
+			end
 		elseif type(default) == "boolean" and key ~= "enabled" then
 			if value == "1" or value == "0" then t[key], ok = value == "1", true end
 		elseif type(default) == "number" then
@@ -450,6 +465,14 @@ local function DecodeProfile(text)
 			if CHOICES[key] and CHOICES[key][value] then t[key], ok = value, true end
 		end
 		if ok then used = used + 1 end
+	end
+	-- Hover goes on elements this version has, and on the string's own custom frames.
+	for _, h in ipairs(hover) do
+		local el, frame = BY_KEY[h.key], h.key:match("^custom:(.+)$")
+		if (el and not el.custom) or (frame and customSeen[frame]) then
+			t.hoverKeep[h.key] = h.value ~= "show" or nil
+			t.hoverShow[h.key] = h.value ~= "keep" or nil
+		end
 	end
 	if used == 0 then return nil, "That profile string is empty or damaged." end
 	FillMissing(t)

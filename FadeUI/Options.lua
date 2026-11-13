@@ -566,7 +566,24 @@ end
 -------------------------------------------------------------------------------
 
 local PROFILE_W, DIALOG_W = 180, 460
-local menu, dialog
+-- How wide the profile button and its list can grow for a long name. The
+-- button's limit keeps the buttons after it inside the window; the list hangs
+-- below, so it can be wider.
+local PROFILE_BUTTON_MAX_W, PROFILE_MENU_MAX_W = 460, 600
+local menu, dialog, measure
+
+-- The width that shows each of `names` in full, `extra` being the room needed
+-- besides the text: at least PROFILE_W, and at most `max` (longer names are cut off).
+local function FitWidth(names, extra, max)
+	-- An unplaced font string, just for measuring: it's never drawn.
+	if not measure then measure = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall") end
+	local w = PROFILE_W
+	for _, name in ipairs(names) do
+		measure:SetText(name)
+		w = math.max(w, math.ceil(measure:GetStringWidth()) + extra)
+	end
+	return math.min(w, max)
+end
 
 -- The list of profiles under the profile button. Clicking one switches to it.
 local function ToggleProfileMenu()
@@ -584,25 +601,27 @@ local function ToggleProfileMenu()
 		return
 	end
 	local names, current = FadeUI.GetProfiles(), FadeUI.GetProfile()
+	local w = FitWidth(names, 16, PROFILE_MENU_MAX_W) -- as wide as the longest name
 	for i, name in ipairs(names) do
 		local b = menu.items[i]
 		if not b then
-			b = Button(menu, "", PROFILE_W - 2, SEG_H, function(self)
+			b = Button(menu, "", w - 2, SEG_H, function(self)
 				menu:Hide()
 				FadeUI.SetProfile(self.profile)
 			end)
 			b:SetPoint("TOPLEFT", 1, -1 - (i - 1) * SEG_H)
-			b.label:SetWidth(PROFILE_W - 14)
 			b.label:SetWordWrap(false)
 			menu.items[i] = b
 		end
+		b:SetWidth(w - 2)
+		b.label:SetWidth(w - 14)
 		b.profile = name
 		b.label:SetText(name)
 		SetActive(b, name == current)
 		b:Show()
 	end
 	for i = #names + 1, #menu.items do menu.items[i]:Hide() end
-	menu:SetSize(PROFILE_W, #names * SEG_H + 2)
+	menu:SetSize(w, #names * SEG_H + 2)
 	menu:Show()
 end
 
@@ -1080,6 +1099,7 @@ function FadeUI.RefreshOptions()
 	local profile = FadeUI.GetProfile()
 	local isDefault = profile == FadeUI.DEFAULT_PROFILE
 	refs.profile.label:SetText(profile)
+	refs.profile:SetWidth(FitWidth({ profile }, 30, PROFILE_BUTTON_MAX_W)) -- the buttons after it move along
 	refs.profileDelete:SetEnabled(not isDefault)
 	refs.profileDelete:SetAlpha(isDefault and 0.45 or 1)
 	local undo, redo = FadeUI.HistorySize()
