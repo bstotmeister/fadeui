@@ -18,6 +18,21 @@ local SEG_W, SEG_H, SEG_GAP = 96, 20, 3
 local ROW_H, GROUP_H = 26, 30
 -- The On hover columns (Stay and Show), after the five mode buttons.
 local HOVER_X, HOVER_W = LABEL_W + 5 * (SEG_W + SEG_GAP) + 8, 44
+-- Advanced: each element's fade times, in columns after On hover. The
+-- window is wider by TIMES_W while they're shown.
+local TIME_W, TIME_GAP = 40, 4
+local TIMES_X = HOVER_X + 2 * HOVER_W + 8
+local TIMES_W = 3 * (TIME_W + TIME_GAP) + 12
+
+-- The fade times: at the top for every element, and (Advanced) in each row.
+local FADE_BOXES = {
+	{ field = "fadeIn",    label = "Fade in",  short = "In",
+	  tip = "Seconds an element takes to fade in when it appears. 0 = instant." },
+	{ field = "fadeOut",   label = "Fade out", short = "Out",
+	  tip = "Seconds an element takes to fade out before it hides. 0 = instant. In combat, elements always hide instantly." },
+	{ field = "fadeDelay", label = "Delay",    short = "Delay",
+	  tip = "Seconds to wait before an element starts fading out, e.g. after combat ends. If it's needed again during the wait, it stays." },
+}
 
 local win
 local rows = {}
@@ -116,8 +131,10 @@ local function Checkbox(parent, label, onClick)
 	return c
 end
 
--- A small box for a number of seconds. `field` is the setting it edits.
-local function SecondsBox(parent, field)
+-- A small box for a number of seconds. `field` is the setting it edits. With
+-- `row`, it's that row's element's own time (Advanced): empty uses the one for
+-- every element, shown greyed out.
+local function SecondsBox(parent, field, row)
 	local e = CreateFrame("EditBox", nil, parent)
 	e:SetSize(40, SEG_H)
 	e:SetAutoFocus(false)
@@ -126,14 +143,27 @@ local function SecondsBox(parent, field)
 	e:SetMaxLetters(4)
 	Fill(e, "BACKGROUND", BTN)
 	Outline(e, LINE)
-	e.field = field
+	e.field, e.row = field, row
+	if row then
+		e.hint = Text(e, "GameFontDisableSmall", "")
+		e.hint:SetPoint("CENTER")
+		e:SetScript("OnTextChanged", function(self) self.hint:SetShown(self:GetText() == "") end)
+	end
 	e:SetScript("OnEnterPressed", e.ClearFocus)
 	e:SetScript("OnEscapePressed", function(self)
 		self.cancel = true
 		self:ClearFocus()
 	end)
 	e:SetScript("OnEditFocusLost", function(self)
-		if not self.cancel then FadeUI.SetTime(self.field, tonumber(self:GetText())) end
+		local text = strtrim(self:GetText())
+		local n = tonumber(text)
+		if not self.cancel then
+			if not self.row then
+				FadeUI.SetTime(self.field, n)
+			elseif text == "" or n then -- empty: back to the time for every element
+				FadeUI.SetElementTime(self.row.el.key, self.field, n)
+			end
+		end
 		self.cancel = nil
 		FadeUI.RefreshOptions() -- shows the stored value (rounded, clamped, or unchanged)
 	end)
@@ -216,6 +246,17 @@ local HOVER = {
 	{ field = "hoverShow", label = "Show", title = "Show on hover",
 	  tip = "Shows it whenever the mouse is over where it would be, instead of hiding it completely like Alt-Z. Moving the mouse away waits the Delay, then it fades out. While it's hidden, its spot doesn't block clicks." .. PROTECTED_NOTE },
 }
+-- Why an element's own fade time does nothing, if it doesn't: some elements
+-- show and hide without fading, and chat hides as soon as it's idle (unless
+-- the mouse was over it, with On hover).
+local function TimeUnused(el, field)
+	if field == "fadeDelay" then
+		local db = FadeUI.GetDB()
+		return el.key == "chat" and not (db.hoverKeep.chat or db.hoverShow.chat)
+			and "Chat hides as soon as it's idle or you stop typing, so this only applies with On hover, after the mouse leaves it."
+	end
+	return el.direct and (el.label .. " shows and hides without fading, so this does nothing.")
+end
 
 -- Everything the row does goes by row.el, so a custom frame's row can be
 -- reused for another (see RefreshCustomRows).
@@ -316,6 +357,21 @@ local function ElementRow(parent, el)
 		Tooltip(row.barsDrag, "Action bars: while dragging",
 			"Shows your action bars and pet bar whenever you pick up something you can put on them (a spell, item, macro...), whatever their mode above, so you can drop it into a slot. Not in combat.")
 		row.extraH = 22
+	end
+
+	-- Advanced: the element's own fade times (shown by RefreshOptions).
+	row.times = {}
+	for i, info in ipairs(FADE_BOXES) do
+		local e = SecondsBox(row, info.field, row)
+		e:SetPoint("LEFT", TIMES_X + (i - 1) * (TIME_W + TIME_GAP), 0)
+		Tooltip(e, function() return row.el.label .. ": " .. info.label:lower() end, function()
+			local lines = { info.tip, ("Leave it empty to use the %s time at the top (%gs)."):format(
+				info.label, (FadeUI.GetDB()[info.field] or 0) / 10) }
+			local unused = TimeUnused(row.el, info.field)
+			if unused then table.insert(lines, 1, "|cffff6060" .. unused .. "|r") end
+			return table.concat(lines, "\n\n")
+		end)
+		row.times[i] = e
 	end
 
 	local function over() hl:Show() end
@@ -801,15 +857,6 @@ local FEEDBACK_LINKS = {
 	{ label = "Comments (CurseForge):",      url = "https://www.curseforge.com/wow/addons/fadeui/comments" },
 }
 
-local FADE_BOXES = {
-	{ field = "fadeIn",    label = "Fade in",
-	  tip = "Seconds an element takes to fade in when it appears. 0 = instant." },
-	{ field = "fadeOut",   label = "Fade out",
-	  tip = "Seconds an element takes to fade out before it hides. 0 = instant. In combat, elements always hide instantly." },
-	{ field = "fadeDelay", label = "Delay",
-	  tip = "Seconds to wait before an element starts fading out, e.g. after combat ends. If it's needed again during the wait, it stays." },
-}
-
 local function Build()
 	win = CreateFrame("Frame", "FadeUIOptions", UIParent)
 	win:SetSize(WIDTH, HEIGHT)
@@ -1057,6 +1104,16 @@ local function Build()
 	end
 	local onHover = Text(cols, "GameFontDisableSmall", "On hover")
 	onHover:SetPoint("BOTTOM", cols, "TOPLEFT", HOVER_X + HOVER_W, 0)
+	refs.timeHeads = {}
+	for i, info in ipairs(FADE_BOXES) do
+		local fs = Text(cols, "GameFontDisableSmall", info.short)
+		fs:SetWidth(TIME_W)
+		fs:SetPoint("LEFT", TIMES_X + (i - 1) * (TIME_W + TIME_GAP), 0)
+		refs.timeHeads[i] = fs
+	end
+	local timesTitle = Text(cols, "GameFontDisableSmall", "Fade times")
+	timesTitle:SetPoint("BOTTOM", cols, "TOPLEFT", TIMES_X + (3 * TIME_W + 2 * TIME_GAP) / 2, 0)
+	refs.timeHeads[#refs.timeHeads + 1] = timesTitle
 	local colRule = cols:CreateTexture(nil, "ARTWORK")
 	colRule:SetColorTexture(LINE[1], LINE[2], LINE[3], 1)
 	colRule:SetHeight(1)
@@ -1116,6 +1173,12 @@ local function Build()
 	refs.simCombat:SetPoint("LEFT", refs.redo, "RIGHT", 8, 0)
 	Tooltip(refs.simCombat, "Simulate combat",
 		"Acts as if you're in combat, so you can see what each mode shows and hides. Click again (or type /fui combat) to end it, or it ends when a real fight starts.")
+	refs.advanced = Checkbox(foot, "Advanced", function(self)
+		FadeUI.SetAdvanced(self:GetChecked())
+	end)
+	refs.advanced:SetPoint("LEFT", refs.simCombat, "RIGHT", 16, 0)
+	Tooltip(refs.advanced, "Advanced",
+		"Shows a fade in, fade out and delay time for each element, in columns at the end of the list. Leave one empty to use the time at the top.\n\nWhile this is off, every element uses the times at the top. The ones you set are kept for when you turn it back on.")
 	refs.keyHint = Text(foot, "GameFontHighlightSmall", "", MUTED)
 	refs.keyHint:SetPoint("RIGHT", -PAD, 0)
 
@@ -1191,6 +1254,9 @@ function FadeUI.RefreshOptions()
 	refs.undo:SetAlpha(undo > 0 and 1 or 0.45)
 	refs.redo:SetEnabled(redo > 0)
 	refs.redo:SetAlpha(redo > 0 and 1 or 0.45)
+	refs.advanced:SetChecked(db.advanced)
+	win:SetWidth(WIDTH + (db.advanced and TIMES_W or 0))
+	for _, fs in ipairs(refs.timeHeads) do fs:SetShown(db.advanced) end
 	for _, e in ipairs(refs.fade) do
 		if not e:HasFocus() then e:SetText(("%g"):format((db[e.field] or 0) / 10)) end
 	end
@@ -1215,6 +1281,16 @@ function FadeUI.RefreshOptions()
 			for _, c in ipairs(row.hover) do
 				c:SetChecked(db[c.field][row.el.key] and true or false)
 				c:SetAlpha((off or (c.field == "hoverKeep" and showOn)) and 0.45 or 1)
+			end
+			local own = db.times[row.el.key]
+			for _, e in ipairs(row.times) do
+				e:SetShown(db.advanced)
+				if db.advanced then
+					local t = own and own[e.field]
+					if not e:HasFocus() then e:SetText(t and ("%g"):format(t / 10) or "") end
+					e.hint:SetText(("%g"):format((db[e.field] or 0) / 10))
+					e:SetAlpha((missing or TimeUnused(row.el, e.field)) and 0.45 or 1)
+				end
 			end
 			if missing then
 				row.label:SetText(row.el.label .. " |cff777777(not found)|r")

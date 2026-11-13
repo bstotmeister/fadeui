@@ -241,6 +241,8 @@ local function Defaults(target)
 	target.custom = {}             -- names of the custom frames (Custom.lua); their modes are in `modes`
 	target.hoverKeep = { bar1 = true }  -- element key -> true: stays shown while the mouse is over it (see HoverCheck)
 	target.hoverShow = { meter = true } -- element key -> true: shows whenever the mouse is over it
+	target.advanced = false        -- Advanced settings shown, and in use (see GetTime)
+	target.times = {}              -- elements' own fade times, by key: { fadeIn, fadeOut, fadeDelay } (any of them), tenths of a second
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do
 		if not el.custom then target.modes[el.key] = el.default end
@@ -274,6 +276,11 @@ local function CopySettings(from, to)
 			to[field] = {}
 			for key, on in pairs(from[field]) do to[field][key] = on end
 		end
+	end
+	to.times = {}
+	for key, own in pairs(from.times or {}) do
+		to.times[key] = {}
+		for field, t in pairs(own) do to.times[key][field] = t end
 	end
 end
 
@@ -374,7 +381,10 @@ end
 --   c.<frame>=<mode>    custom frames, in order; names are %-escaped
 --   h.<element>=keep, show or keep+show   On hover: Stay, Show (keys %-escaped,
 --                       as a custom frame's is "custom:<frame>"); none means neither
+--   t.<element>=<in>/<out>/<delay>   Advanced: the element's own fade times
+--                       (keys escaped as for h.); an empty one, or none, means it has none
 local SHARE_VERSION = 1
+local TIME_FIELDS = { "fadeIn", "fadeOut", "fadeDelay" } -- in t.'s order
 
 local ANCHORS = { TOPLEFT = true, TOP = true, TOPRIGHT = true, LEFT = true, CENTER = true,
 	RIGHT = true, BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true }
@@ -424,6 +434,14 @@ function FadeUI.ExportProfile()
 			parts[#parts + 1] = "h." .. Escape(el.key) .. "=" .. (keep and show and "keep+show" or keep and "keep" or "show")
 		end
 	end
+	for _, el in ipairs(ELEMENTS) do
+		local own = db.times[el.key]
+		if own then
+			local v = {}
+			for i, field in ipairs(TIME_FIELDS) do v[i] = own[field] or "" end
+			parts[#parts + 1] = "t." .. Escape(el.key) .. "=" .. table.concat(v, "/")
+		end
+	end
 	return "FadeUI:" .. SHARE_VERSION .. ":" .. table.concat(parts, ",")
 end
 
@@ -438,8 +456,8 @@ local function DecodeProfile(text)
 
 	local d = {}
 	Defaults(d)
-	local t = { enabled = db.enabled, modes = {}, custom = {}, hoverKeep = {}, hoverShow = {} }
-	local used, customSeen, hover = 0, {}, {}
+	local t = { enabled = db.enabled, modes = {}, custom = {}, hoverKeep = {}, hoverShow = {}, times = {} }
+	local used, customSeen, hover, times = 0, {}, {}, {}
 	for key, value in body:gmatch("([^,=]+)=([^,]*)") do
 		local kind, rest = key:match("^(%a)%.(.+)$")
 		local default = d[key]
@@ -461,6 +479,19 @@ local function DecodeProfile(text)
 				hover[#hover + 1] = { key = Unescape(rest), value = value }
 				ok = true
 			end
+		elseif kind == "t" then
+			local own, i = {}, 0
+			for piece in (value .. "/"):gmatch("([^/]*)/") do
+				i = i + 1
+				local n = tonumber(piece)
+				if TIME_FIELDS[i] and n and n == n and math.abs(n) ~= math.huge then
+					own[TIME_FIELDS[i]] = math.min(FadeUI.MAX_TIME, math.max(0, math.floor(n + 0.5)))
+				end
+			end
+			if next(own) then
+				times[#times + 1] = { key = Unescape(rest), own = own }
+				ok = true
+			end
 		elseif type(default) == "boolean" and key ~= "enabled" then
 			if value == "1" or value == "0" then t[key], ok = value == "1", true end
 		elseif type(default) == "number" then
@@ -474,13 +505,20 @@ local function DecodeProfile(text)
 		end
 		if ok then used = used + 1 end
 	end
-	-- Hover goes on elements this version has, and on the string's own custom frames.
+	-- Hover and times go on elements this version has, and on the string's own
+	-- custom frames.
+	local function Known(key)
+		local el, frame = BY_KEY[key], key:match("^custom:(.+)$")
+		return (el and not el.custom) or (frame and customSeen[frame])
+	end
 	for _, h in ipairs(hover) do
-		local el, frame = BY_KEY[h.key], h.key:match("^custom:(.+)$")
-		if (el and not el.custom) or (frame and customSeen[frame]) then
+		if Known(h.key) then
 			t.hoverKeep[h.key] = h.value ~= "show" or nil
 			t.hoverShow[h.key] = h.value ~= "keep" or nil
 		end
+	end
+	for _, x in ipairs(times) do
+		if Known(x.key) then t.times[x.key] = x.own end
 	end
 	if used == 0 then return nil, "That profile string is empty or damaged." end
 	FillMissing(t)
@@ -554,6 +592,16 @@ function FadeUI.HistorySize()
 	return #h.undo, #h.redo
 end
 
+-- An element's fade time, in tenths of a second. `field` is "fadeIn", "fadeOut"
+-- or "fadeDelay". With Advanced on, an element can have its own; otherwise (or
+-- for no element) it's the one for everything.
+local function GetTime(key, field)
+	if not db then return 0 end
+	local own = db.advanced and key and db.times[key]
+	return own and own[field] or db[field] or 0
+end
+FadeUI.GetTime = GetTime
+
 -------------------------------------------------------------------------------
 -- Holders
 -------------------------------------------------------------------------------
@@ -579,7 +627,7 @@ animator:Hide()
 animator:SetScript("OnUpdate", function(self, elapsed)
 	local busy = false
 	for h, target in pairs(fading) do
-		local duration = db and (target == 1 and db.fadeIn or db.fadeOut) or 0
+		local duration = GetTime(h.fadeuiKey, target == 1 and "fadeIn" or "fadeOut")
 		local step = duration > 0 and elapsed / (duration / 10) or 1
 		local a = h:GetAlpha() + (target == 1 and step or -step)
 		if not h:IsShown() or a >= 1 then
@@ -611,7 +659,7 @@ local function StartFadeOut(h)
 	h.fadeuiTimer = nil
 	if not h:IsShown() then return end
 	-- A direct element isn't inside its holder, so fading the holder does nothing.
-	if (db.fadeOut or 0) > 0 and not h.fadeuiDirect then
+	if GetTime(h.fadeuiKey, "fadeOut") > 0 and not h.fadeuiDirect then
 		fading[h] = 0
 		animator:Show()
 	else
@@ -671,7 +719,7 @@ local function Holder_State(h, state, now)
 		fading[h] = nil
 		FinishHide(h)
 	elseif h:IsShown() and fading[h] ~= 0 then
-		local delay = now and 0 or (db.fadeDelay or 0) / 10
+		local delay = now and 0 or GetTime(h.fadeuiKey, "fadeDelay") / 10
 		if delay > 0 then
 			h.fadeuiTimer = C_Timer.NewTimer(delay, function() StartFadeOut(h) end)
 		else
@@ -715,7 +763,7 @@ local function Holder_OnShow(self)
 		SetFrameShown(self.fadeuiFrame, true)
 		return
 	end
-	if db and (db.fadeIn or 0) > 0 and loggedIn and attached[self.fadeuiFrame] then
+	if GetTime(self.fadeuiKey, "fadeIn") > 0 and loggedIn and attached[self.fadeuiFrame] then
 		self:SetAlpha(0)
 		fading[self] = 1
 		animator:Show()
@@ -1099,6 +1147,7 @@ function FadeUI.Apply()
 						local style = FRAME_STYLE[name]
 						local h = style == "direct" and AttachDirect(f) or style == "inPlace" and AttachInPlace(f)
 							or Attach(f, style == "secure")
+						h.fadeuiKey = el.key -- for its fade times
 						h.fadeuiChat = el.key == "chat"
 						h.fadeuiBags = el.key == "bags"
 						h.fadeuiDrag = el.drag
@@ -1239,10 +1288,36 @@ function FadeUI.SetSimCombat(on)
 	FadeUI.Changed()
 end
 
+function FadeUI.SetAdvanced(on)
+	if not db then return end
+	db.advanced = on and true or false
+	FadeUI.Changed()
+end
+
+local function Tenths(seconds)
+	return math.min(FadeUI.MAX_TIME, math.max(0, math.floor(seconds * 10 + 0.5)))
+end
+
 -- `field` is "fadeIn", "fadeOut", "fadeDelay", "chatIdle", "rangeTime", "resourceTime", "cooldownTime" or "cooldownBuffer"; `seconds` may be fractional.
 function FadeUI.SetTime(field, seconds)
 	if not db or type(seconds) ~= "number" then return end
-	db[field] = math.min(FadeUI.MAX_TIME, math.max(0, math.floor(seconds * 10 + 0.5)))
+	db[field] = Tenths(seconds)
+	FadeUI.Changed()
+end
+
+-- An element's own fade time (see GetTime). `seconds` nil goes back to the one
+-- for everything.
+function FadeUI.SetElementTime(key, field, seconds)
+	if not db then return end
+	local own = db.times[key]
+	if type(seconds) == "number" then
+		own = own or {}
+		own[field] = Tenths(seconds)
+		db.times[key] = own
+	elseif own then
+		own[field] = nil
+		if next(own) == nil then db.times[key] = nil end
+	end
 	FadeUI.Changed()
 end
 

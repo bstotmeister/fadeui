@@ -86,6 +86,7 @@ function FadeUI.RemoveCustomFrame(name)
 	end
 	db.modes[PREFIX .. name] = nil
 	db.hoverKeep[PREFIX .. name], db.hoverShow[PREFIX .. name] = nil, nil
+	db.times[PREFIX .. name] = nil
 	FadeUI.RebuildCustom()
 	FadeUI.Changed()
 end
