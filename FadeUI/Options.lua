@@ -402,22 +402,49 @@ local function ScrollArea(parent)
 	local thumb = sf:CreateTexture(nil, "OVERLAY")
 	thumb:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.8)
 	thumb:SetWidth(3)
+	-- An invisible strip over the track takes the clicks, since textures can't.
+	local bar = CreateFrame("Frame", nil, sf)
+	bar:SetWidth(12)
+	bar:SetPoint("TOPLEFT", sf, "TOPRIGHT", 1, 0)
+	bar:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 1, 0)
+	bar:EnableMouse(true)
+	local thumbH = 24
 
 	local function update()
 		local view, total = sf:GetHeight(), content:GetHeight()
 		local max = math.max(0, total - view)
 		if max <= 0 then
-			thumb:Hide() track:Hide()
+			thumb:Hide() track:Hide() bar:Hide()
 			sf:SetVerticalScroll(0)
 			return
 		end
-		thumb:Show() track:Show()
-		local h = math.max(24, view * view / total)
+		thumb:Show() track:Show() bar:Show()
+		thumbH = math.max(24, view * view / total)
 		local pos = sf:GetVerticalScroll() / max
-		thumb:SetHeight(h)
+		thumb:SetHeight(thumbH)
 		thumb:ClearAllPoints()
-		thumb:SetPoint("TOPRIGHT", sf, "TOPRIGHT", 8, -pos * (view - h))
+		thumb:SetPoint("TOPRIGHT", sf, "TOPRIGHT", 8, -pos * (view - thumbH))
 	end
+
+	-- Pressing on the thumb drags it; pressing elsewhere on the track jumps the
+	-- thumb's middle to the cursor and keeps dragging from there.
+	local function cursorY() return select(2, GetCursorPosition()) / bar:GetEffectiveScale() end
+	local function stop(self) self:SetScript("OnUpdate", nil) end
+	bar:SetScript("OnMouseDown", function(self, button)
+		if button ~= "LeftButton" then return end
+		local y, top, bottom = cursorY(), thumb:GetTop(), thumb:GetBottom()
+		local grab = (top and y <= top and y >= bottom) and (top - y) or thumbH / 2
+		self:SetScript("OnUpdate", function()
+			local room = sf:GetHeight() - thumbH
+			if room <= 0 then return end
+			local max = math.max(0, content:GetHeight() - sf:GetHeight())
+			local d = math.min(room, math.max(0, self:GetTop() - cursorY() - grab))
+			sf:SetVerticalScroll(d / room * max)
+			update()
+		end)
+	end)
+	bar:SetScript("OnMouseUp", stop)
+	bar:SetScript("OnHide", stop)
 
 	sf:EnableMouseWheel(true)
 	sf:SetScript("OnMouseWheel", function(self, delta)
