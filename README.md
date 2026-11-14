@@ -13,6 +13,9 @@ working on hidden bars.
 - Keybindings → AddOns → FadeUI — toggle FadeUI (like Alt-Z) or open options
 - Addon compartment (minimap) button — left-click toggles, right-click opens options
 
+Drag the grip in the options window's bottom-right corner to make it bigger or smaller, from
+75% to 150%, and double-click it to go back to 100%.
+
 ## Development
 
 Addon source lives in `FadeUI/`. Symlink it into your WoW client so changes load on `/reload`:

@@ -887,6 +887,7 @@ local FEEDBACK_LINKS = {
 local function Build()
 	win = CreateFrame("Frame", "FadeUIOptions", UIParent)
 	win:SetSize(WIDTH, HEIGHT)
+	win:SetScale(FadeUI.GetScale())
 	win:SetPoint("CENTER")
 	win:SetFrameStrata("DIALOG")
 	win:SetToplevel(true)
@@ -1208,6 +1209,54 @@ local function Build()
 		"Shows a fade in, fade out and delay time for each element, in columns at the end of the list. Leave one empty to use the time at the top.\n\nWhile this is off, every element uses the times at the top. The ones you set are kept for when you turn it back on.")
 	refs.keyHint = Text(foot, "GameFontHighlightSmall", "", MUTED)
 	refs.keyHint:SetPoint("RIGHT", -PAD, 0)
+
+	-- Size: the grip in the corner scales the whole window, keeping its top-left
+	-- corner where it is. Drags are measured from where they start, so a click
+	-- doesn't make it jump.
+	local function ScaleTo(s, left, top)
+		win:SetScale(s)
+		win:ClearAllPoints()
+		win:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left / s, top / s)
+	end
+	local function Corner()
+		local s = win:GetScale()
+		return (win:GetLeft() or 0) * s, (win:GetTop() or 0) * s
+	end
+	local function Cursor()
+		local cx, cy = GetCursorPosition()
+		local u = UIParent:GetEffectiveScale()
+		return cx / u, cy / u
+	end
+	local grip = CreateFrame("Button", nil, foot)
+	grip:SetSize(14, 14)
+	grip:SetPoint("BOTTOMRIGHT", -2, 2)
+	grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+	grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+	grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+	local function Drag(self)
+		local cx, cy = Cursor()
+		local f = math.max((cx - self.left) / math.max(1, self.x0 - self.left),
+			(self.top - cy) / math.max(1, self.top - self.y0))
+		ScaleTo(math.min(FadeUI.MAX_SCALE, math.max(FadeUI.MIN_SCALE, self.s0 * f)), self.left, self.top)
+	end
+	grip:SetScript("OnMouseDown", function(self)
+		self.s0 = win:GetScale()
+		self.left, self.top = Corner()
+		self.x0, self.y0 = Cursor()
+		self:SetScript("OnUpdate", Drag)
+	end)
+	grip:SetScript("OnMouseUp", function(self)
+		self:SetScript("OnUpdate", nil)
+		FadeUI.SetScale(win:GetScale())
+	end)
+	grip:SetScript("OnDoubleClick", function()
+		local left, top = Corner()
+		ScaleTo(1, left, top)
+		FadeUI.SetScale(1)
+	end)
+	Tooltip(grip, "Size",
+		"Drag to make the window bigger or smaller, from 75% to 150%. Double-click to go back to its usual size. Every character uses the same size.")
+	refs.grip = grip
 
 	-- Feedback links, in a strip that drops down under the header while it's
 	-- open, over the settings below. Addons can't open a browser, so each link

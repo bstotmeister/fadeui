@@ -206,7 +206,9 @@ end
 --
 -- Settings live in named profiles, shared by every character on the account
 -- (FadeUIAccountDB.profiles). Each character remembers which one it uses
--- (FadeUIDB.profile), and changes go straight into that profile.
+-- (FadeUIDB.profile), and changes go straight into that profile. The options
+-- window's size is for every character too (FadeUIAccountDB.scale, 1 for 100%;
+-- nil while it's 1), and isn't part of a profile.
 -------------------------------------------------------------------------------
 
 local db -- the settings in use: this character's profile
@@ -1292,6 +1294,22 @@ function FadeUI.SetAdvanced(on)
 	if not db then return end
 	db.advanced = on and true or false
 	FadeUI.Changed()
+end
+
+-- The options window's size, for every character: from 75% to 150%.
+FadeUI.MIN_SCALE, FadeUI.MAX_SCALE = 0.75, 1.5
+
+local function ClampScale(s)
+	return math.min(FadeUI.MAX_SCALE, math.max(FadeUI.MIN_SCALE, s))
+end
+
+function FadeUI.GetScale()
+	return ClampScale(tonumber(FadeUIAccountDB.scale) or 1)
+end
+
+function FadeUI.SetScale(s)
+	s = math.floor(ClampScale(s) * 100 + 0.5) / 100
+	FadeUIAccountDB.scale = s ~= 1 and s or nil
 end
 
 local function Tenths(seconds)
