@@ -1140,6 +1140,7 @@ function FadeUI.Apply()
 		return
 	end
 	FadeUI.pendingApply = false
+	FadeUI.FireAddons("BeforeApply")
 
 	local active = FadeUI.IsActive()
 	local seen = {} -- frame -> true once an element has it

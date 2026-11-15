@@ -8,6 +8,9 @@
 -- chat tab. It moves their frames into the chat frame and back, and its embed
 -- code goes by their parent. So while a window is embedded FadeUI leaves the
 -- frames Details moves alone: they're inside the chat frame and fade with chat.
+-- This is checked before every Apply, because the first frame Details moves
+-- makes FadeUI apply again in the middle of the embed; holding the others then
+-- would make Details size them to fit FadeUI's holder.
 
 local _, ns = ...
 local FadeUI = ns.FadeUI
@@ -58,15 +61,15 @@ FadeUI.RegisterAddon({
 		-- Details builds a window's frames the first time it opens, which can be
 		-- after login: a new window, or one that was closed.
 		Details:CreateEventListener():RegisterEvent("DETAILS_INSTANCE_OPEN", FadeUI.Apply)
+		-- Releasing doesn't make FadeUI apply by itself, so the frames are held
+		-- again once Details has put them back.
 		local embed = Details.chat_embed
 		if embed and embed.DoEmbed and embed.ReleaseEmbed then
-			UpdateEmbedded()
-			local function Update()
-				UpdateEmbedded()
-				FadeUI.Apply()
-			end
-			hooksecurefunc(embed, "DoEmbed", Update)
-			hooksecurefunc(embed, "ReleaseEmbed", Update)
+			hooksecurefunc(embed, "DoEmbed", FadeUI.Apply)
+			hooksecurefunc(embed, "ReleaseEmbed", FadeUI.Apply)
 		end
+	end,
+	BeforeApply = function()
+		if Details and Details.chat_tab_embed then UpdateEmbedded() end
 	end,
 })
