@@ -11,6 +11,8 @@
 --                -- rows of its own, under "Other addons" (shown only while it's loaded)
 --     OnLogin    = function() end, -- once, at login (or when it loads, if that's later)
 --     OnChatIdle = function() end, -- chat has just gone idle
+--     BeforeApply = function() end, -- FadeUI is about to hide or put back frames; a last
+--                                    -- chance to change the frames listed above
 --   })
 
 local _, ns = ...
