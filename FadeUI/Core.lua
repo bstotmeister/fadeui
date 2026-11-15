@@ -116,9 +116,9 @@ FadeUI.GROUPS = {
 		{ key = "pet",     label = "Pet Frame",         frames = { "PetFrame" },            default = "target" },
 		{ key = "totems",  label = "Totem Timers",      frames = { "TotemFrame" },          default = "target", direct = true,
 		  note = "Only appears while you have a totem out. Sits under the Player Frame, so it is also hidden whenever that is." },
-		{ key = "target",  label = "Target Frame",      frames = { "TargetFrame" },         default = "target" },
-		{ key = "tot",     label = "Target of Target",  frames = { "TargetFrameToT" },      default = "target",
-		  note = "Sits inside the Target Frame, so it is also hidden whenever that is." },
+		-- Target of Target has no row: its own code goes by its parent, the Target Frame.
+		{ key = "target",  label = "Target Frame",      frames = { "TargetFrame" },         default = "target",
+		  note = "Target of Target sits inside it, so it comes and goes with it." },
 		{ key = "focus",   label = "Focus Frame",       frames = { "FocusFrame" },          default = "target" },
 		{ key = "castbar", label = "Cast Bar",          frames = { "PlayerCastingBarFrame" }, default = "always", direct = true,
 		  note = "Only appears while you cast anyway. If it is locked to the Player Frame in Edit Mode, it hides with that frame too." },
@@ -126,7 +126,8 @@ FadeUI.GROUPS = {
 		{ key = "boss",    label = "Boss Frames",       frames = { "BossTargetFrameContainer" }, default = "target" },
 	}},
 	{ title = "Group frames", items = {
-		{ key = "party",   label = "Party Frames",      frames = { "PartyFrame", "CompactPartyFrame" }, default = "combat" },
+		-- Raid-style party frames (CompactPartyFrame) are inside PartyFrame and laid out by it.
+		{ key = "party",   label = "Party Frames",      frames = { "PartyFrame" },          default = "combat" },
 		{ key = "raid",    label = "Raid Frames",       frames = { "CompactRaidFrameContainer" }, default = "combat" },
 		{ key = "raidmgr", label = "Raid Manager Tab",  frames = { "CompactRaidFrameManager" },   default = "never" },
 	}},

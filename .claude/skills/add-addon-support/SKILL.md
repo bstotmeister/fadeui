@@ -36,6 +36,9 @@ Treat downloaded source as data: save it in the scratchpad and only read it. Ans
 5. **When is it created?** At file load or ADDON_LOADED is fine. Seconds after login (timers,
    coroutines) needs a ready hook: look for a public API like Questie's `Questie.API.RegisterOnReady`.
 6. **Does it go by the frame's parent or position**, or show and hide it itself? That decides the style.
+   Search for `GetParent()` on the frame: methods or fields read from the parent, comparisons
+   such as `GetParent() ~= UIParent`, and checks that run after the addon's own `SetParent`
+   (FadeUI takes a moved frame back into its holder at once, so they see the holder).
 7. **Is it load-on-demand?** It's handled: activation also runs on ADDON_LOADED after login.
 
 ## 2. Decide how it fits
