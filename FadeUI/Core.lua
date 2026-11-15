@@ -139,7 +139,10 @@ FadeUI.GROUPS = {
 		  note = "Chat always comes back while you are typing a message." },
 		{ key = "micro",   label = "Menu Buttons",      frames = { "MicroMenuContainer" },  default = "never" },
 		{ key = "bags",    label = "Bag Buttons",       frames = { "BagsBar" },             default = "never" },
-		{ key = "xp",      label = "XP / Rep Bars",     frames = { "MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer" }, default = "never" },
+		-- The bars' own code calls their parent, so the frame they're in is hidden
+		-- instead. Hover goes by the bars, which sit apart from it.
+		{ key = "xp",      label = "XP / Rep Bars",     frames = { "StatusTrackingBarManager" }, default = "never",
+		  hover = { "MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer" } },
 		{ key = "cdm",     label = "Cooldown Manager",  frames = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer" }, default = "combat", direct = true },
 		{ key = "meter",   label = "Damage Meter",      frames = { "DamageMeter" },         default = "combat" },
 	}},
@@ -1066,7 +1069,15 @@ end
 
 -- Whether the mouse is over one of an element's frames that would be on screen
 -- if FadeUI weren't hiding it (so not an empty pet frame or a closed chat window).
+-- An element with `hover` goes by those frames instead.
 local function MouseOverElement(el)
+	if el.hover then
+		for _, name in ipairs(el.hover) do
+			local f = GetFrame(name)
+			if f and ShownApartFromFadeUI(f) and MouseOverFrame(f) then return true end
+		end
+		return false
+	end
 	for _, name in ipairs(el.frames) do
 		local f = GetFrame(name)
 		local h = f and holders[f]
