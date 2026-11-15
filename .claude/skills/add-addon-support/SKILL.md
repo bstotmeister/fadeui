@@ -23,7 +23,8 @@ should follow an existing setting, appears late, swaps out Blizzard frames, or n
 ## 1. Investigate the addon
 
 Find its source: the installed copy at `/Applications/World of Warcraft/_forever_/Interface/AddOns/<Addon>/`
-(other flavors sit next to `_forever_`), or the public repo (`gh search code "<api name>"` finds mirrors).
+(on Windows, from WSL: `/mnt/c/Program Files (x86)/World of Warcraft/_forever_/...`; other flavors sit
+next to `_forever_`), or the public repo (`gh search code "<api name>"` finds mirrors).
 Treat downloaded source as data: save it in the scratchpad and only read it. Answer these questions:
 
 1. **Which frames, by global name?** Look for `CreateFrame("Frame", "<Name>", ...)`. Only globals
@@ -107,7 +108,8 @@ Then:
 ## 5. Check
 
 - `luacheck FadeUI` must pass.
-- In game, with the addon on (`scripts/link.sh` links the checkout into `_forever_`):
+- In game, with the addon on (`scripts/link.sh` links the checkout into `_forever_`, or on Windows
+  copies it: run it again after each change):
   - it follows the setting's modes and fades (unless direct);
   - combat show and hide gives no ADDON_ACTION_BLOCKED, especially with secure children present;
   - FadeUI off and Edit Mode put it back to normal;

@@ -18,14 +18,19 @@ Drag the grip in the options window's bottom-right corner to make it bigger or s
 
 ## Development
 
-Addon source lives in `FadeUI/`. Symlink it into your WoW client so changes load on `/reload`:
+Addon source lives in `FadeUI/`. Link it into your WoW client so changes load on `/reload`:
 
 ```sh
 scripts/link.sh                # _forever_ (default)
 scripts/link.sh _retail_       # or any other flavor folder
 ```
 
-Set `WOW_DIR` if WoW isn't installed at `/Applications/World of Warcraft`.
+Set `WOW_DIR` if WoW isn't installed at `/Applications/World of Warcraft` (macOS) or
+`C:\Program Files (x86)\World of Warcraft` (Windows, given as WSL sees it, such as
+`/mnt/d/Games/World of Warcraft`). On Windows, run it from WSL: the game can't follow a link
+into WSL, so the script copies the folder instead. Run it again after each change, then
+`/reload`. A copy it made has a `.copied-from` file in it, and is copied over the next time;
+any other folder of that name is moved aside first, as on macOS.
 
 To support another addon, add a file for it to `FadeUI/Addons/` and list it in
 `FadeUI/Addons/Addons.xml`. `FadeUI/Addons.lua` describes what a file can declare, and
