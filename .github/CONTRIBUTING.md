@@ -44,7 +44,8 @@ into that release.
 
    The Release workflow runs the [BigWigs packager](https://github.com/BigWigsMods/packager)
    to build `FadeUI-vX.Y.Z.zip` (dev files are excluded by `.pkgmeta`). It then creates the
-   GitHub release, with notes that list the release's PRs, and closes the milestone.
+   GitHub release, with notes that list the release's PRs and the issues they fix, and
+   closes the milestone.
 3. Upload to CurseForge from your machine. CI doesn't do this. Put `CF_API_KEY=...` in a
    gitignored `.env` at the repo root, check out the tag, and run `scripts/curseforge.sh`.
    It writes `CHANGELOG.md` (the same PR list as the GitHub release), then runs the

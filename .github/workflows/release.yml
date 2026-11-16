@@ -11,13 +11,15 @@ jobs:
     permissions:
       contents: write
       issues: write # close the release's milestone
+      pull-requests: read # the issues each PR closes, for the changelog
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # CHANGELOG.md lists the tag's PRs, grouped by label (.github/release.yml). The
-      # packager uses it as the release notes (manual-changelog in .pkgmeta).
+      # CHANGELOG.md lists the tag's PRs, grouped by label (.github/release.yml), and the
+      # issues each one fixes. The packager uses it as the release notes (manual-changelog
+      # in .pkgmeta).
       - name: Changelog
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
