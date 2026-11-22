@@ -247,7 +247,7 @@ local function Defaults(target)
 	target.custom = {}             -- names of the custom frames (Custom.lua); their modes are in `modes`
 	target.hoverKeep = { bar1 = true }  -- element key -> true: stays shown while the mouse is over it (see HoverCheck)
 	target.hoverShow = { meter = true } -- element key -> true: shows whenever the mouse is over it
-	target.advanced = false        -- Advanced settings shown, and in use (see GetTime)
+	target.advanced = false        -- Advanced settings shown, and in use (see FadeTime)
 	target.times = {}              -- elements' own fade times, by key: { fadeIn, fadeOut, fadeDelay } (any of them), tenths of a second
 	target.modes = {}
 	for _, el in ipairs(ELEMENTS) do
@@ -601,12 +601,13 @@ end
 -- An element's fade time, in tenths of a second. `field` is "fadeIn", "fadeOut"
 -- or "fadeDelay". With Advanced on, an element can have its own; otherwise (or
 -- for no element) it's the one for everything.
-local function GetTime(key, field)
+-- Not named GetTime, which would hide the game's clock from the rest of this file.
+local function FadeTime(key, field)
 	if not db then return 0 end
 	local own = db.advanced and key and db.times[key]
 	return own and own[field] or db[field] or 0
 end
-FadeUI.GetTime = GetTime
+FadeUI.GetTime = FadeTime
 
 -------------------------------------------------------------------------------
 -- Holders
@@ -633,7 +634,7 @@ animator:Hide()
 animator:SetScript("OnUpdate", function(self, elapsed)
 	local busy = false
 	for h, target in pairs(fading) do
-		local duration = GetTime(h.fadeuiKey, target == 1 and "fadeIn" or "fadeOut")
+		local duration = FadeTime(h.fadeuiKey, target == 1 and "fadeIn" or "fadeOut")
 		local step = duration > 0 and elapsed / (duration / 10) or 1
 		local a = h:GetAlpha() + (target == 1 and step or -step)
 		if not h:IsShown() or a >= 1 then
@@ -665,7 +666,7 @@ local function StartFadeOut(h)
 	h.fadeuiTimer = nil
 	if not h:IsShown() then return end
 	-- A direct element isn't inside its holder, so fading the holder does nothing.
-	if GetTime(h.fadeuiKey, "fadeOut") > 0 and not h.fadeuiDirect then
+	if FadeTime(h.fadeuiKey, "fadeOut") > 0 and not h.fadeuiDirect then
 		fading[h] = 0
 		animator:Show()
 	else
@@ -725,7 +726,7 @@ local function Holder_State(h, state, now)
 		fading[h] = nil
 		FinishHide(h)
 	elseif h:IsShown() and fading[h] ~= 0 then
-		local delay = now and 0 or GetTime(h.fadeuiKey, "fadeDelay") / 10
+		local delay = now and 0 or FadeTime(h.fadeuiKey, "fadeDelay") / 10
 		if delay > 0 then
 			h.fadeuiTimer = C_Timer.NewTimer(delay, function() StartFadeOut(h) end)
 		else
@@ -769,7 +770,7 @@ local function Holder_OnShow(self)
 		SetFrameShown(self.fadeuiFrame, true)
 		return
 	end
-	if GetTime(self.fadeuiKey, "fadeIn") > 0 and loggedIn and attached[self.fadeuiFrame] then
+	if FadeTime(self.fadeuiKey, "fadeIn") > 0 and loggedIn and attached[self.fadeuiFrame] then
 		self:SetAlpha(0)
 		fading[self] = 1
 		animator:Show()
@@ -1336,7 +1337,7 @@ function FadeUI.SetTime(field, seconds)
 	FadeUI.Changed()
 end
 
--- An element's own fade time (see GetTime). `seconds` nil goes back to the one
+-- An element's own fade time (see FadeTime). `seconds` nil goes back to the one
 -- for everything.
 function FadeUI.SetElementTime(key, field, seconds)
 	if not db then return end
